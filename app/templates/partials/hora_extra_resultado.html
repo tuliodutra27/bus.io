@@ -1,0 +1,42 @@
+{% if erro %}
+  <div class="bg-rose-50 border border-rose-200 text-rose-700 rounded-lg p-4 text-sm max-w-2xl">
+    {{ erro }}
+  </div>
+{% else %}
+  {% set modo = "marcar" %}
+  {% set colaborador_id = colaborador.id %}
+
+  <div class="bg-white rounded-xl shadow-sm p-5 max-w-3xl">
+    <div class="flex flex-wrap items-center gap-3 justify-between">
+      <div>
+        <p class="text-sm text-slate-500">Solicitante</p>
+        <p class="font-bold">{{ colaborador.nome }}
+          <span class="text-slate-400 font-normal text-sm">· {{ colaborador.bairro or colaborador.cidade }}</span>
+        </p>
+      </div>
+      <div class="text-right">
+        <p class="text-sm text-slate-500">Ônibus de turno sugerido</p>
+        <p class="font-bold">{{ onibus.identificador }}
+          <span class="text-slate-400 font-normal text-sm">· {{ data }}</span>
+        </p>
+      </div>
+    </div>
+
+    {% if mensagem %}
+      <div class="mt-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg p-3 text-sm">
+        {{ mensagem }}
+      </div>
+    {% endif %}
+
+    <div class="mt-4 flex items-center gap-4 text-sm">
+      <span><b class="text-emerald-600 text-lg">{{ mapa.livres }}</b> livres</span>
+      <span><b class="text-slate-700 text-lg">{{ mapa.ocupados }}</b> ocupados</span>
+      <span class="text-slate-400">de {{ mapa.total }}</span>
+    </div>
+
+    <div class="mt-4 inline-block">
+      {% include "partials/seat_map.html" %}
+    </div>
+    <p class="text-xs text-slate-400 mt-3">Clique em um assento livre (verde tracejado) para marcar a hora extra.</p>
+  </div>
+{% endif %}

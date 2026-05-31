@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Painel — bus.io{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between">
+  <div>
+    <h1 class="text-2xl font-bold">Painel de ônibus</h1>
+    <p class="text-sm text-slate-500">Ocupação de hoje ({{ hoje }}) · clique em um ônibus para ver o mapa</p>
+  </div>
+  <a href="/hora-extra" class="bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
+    + Marcar hora extra
+  </a>
+</div>
+
+<div class="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+  {% for card in cards %}
+    {% set o = card.onibus %}
+    <a href="/onibus/{{ o.id }}" class="block bg-white rounded-xl shadow-sm hover:shadow-md transition p-4">
+      <div class="flex items-center justify-between">
+        <span class="text-lg font-bold">{{ o.identificador }}</span>
+        {% if o.tipo.value == 'admin' %}
+          <span class="text-xs bg-sky-100 text-sky-800 px-2 py-0.5 rounded">Admin · 50</span>
+        {% else %}
+          <span class="text-xs bg-violet-100 text-violet-800 px-2 py-0.5 rounded">Turno · 30</span>
+        {% endif %}
+      </div>
+      <p class="text-xs text-slate-500 mt-1">{{ o.rota.cidade if o.rota else '—' }}</p>
+      <p class="text-xs text-slate-400">{{ o.rota.nome if o.rota else 'sem rota' }}</p>
+
+      <div class="mt-3 flex items-center gap-4">
+        <div><span class="text-xl font-bold text-emerald-600">{{ card.livres }}</span>
+          <span class="text-xs text-slate-500">livres</span></div>
+        <div><span class="text-xl font-bold text-slate-700">{{ card.ocupados }}</span>
+          <span class="text-xs text-slate-500">ocupados</span></div>
+        {% if o.exemplo %}
+          <span class="ml-auto text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded self-start">exemplo</span>
+        {% endif %}
+      </div>
+
+      <div class="mt-2 h-2 bg-slate-100 rounded overflow-hidden">
+        <div class="h-full bg-slate-600" style="width: {{ (card.ocupados / card.total * 100) if card.total else 0 }}%"></div>
+      </div>
+    </a>
+  {% endfor %}
+</div>
+{% endblock %}

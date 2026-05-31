@@ -1,0 +1,32 @@
+<div class="p-5">
+  <div class="flex items-start justify-between">
+    <h3 class="text-lg font-bold">Assento {{ assento.numero }}</h3>
+    <button type="button" class="text-slate-400 hover:text-slate-700 text-xl leading-none"
+            @click="$store.modal.open=false">&times;</button>
+  </div>
+  <p class="text-xs text-slate-500 mb-4">{{ onibus.identificador }} · {{ data }}</p>
+
+  {% if assento.status == 'ocupado' and assento.colaborador %}
+    {% set c = assento.colaborador %}
+    {% if assento.origem in ('hora_extra', 'eventual') %}
+      <div class="mb-3 inline-block text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded">
+        {{ 'Hora extra' if assento.origem == 'hora_extra' else 'Eventual' }}
+      </div>
+    {% endif %}
+    <dl class="grid grid-cols-3 gap-y-2 text-sm">
+      <dt class="text-slate-400">Nome</dt><dd class="col-span-2 font-medium">{{ c.nome }}</dd>
+      <dt class="text-slate-400">Matrícula</dt><dd class="col-span-2">{{ c.matricula }}</dd>
+      <dt class="text-slate-400">Setor</dt><dd class="col-span-2">{{ c.setor or '—' }}</dd>
+      <dt class="text-slate-400">Regime</dt><dd class="col-span-2">{{ 'Administrativo' if c.regime == 'admin' else 'Turno' }}</dd>
+      <dt class="text-slate-400">Cidade</dt><dd class="col-span-2">{{ c.cidade }}</dd>
+      <dt class="text-slate-400">Bairro</dt><dd class="col-span-2">{{ c.bairro or '—' }}</dd>
+      <dt class="text-slate-400">Telefone</dt><dd class="col-span-2">{{ c.telefone or '—' }}</dd>
+    </dl>
+  {% else %}
+    <div class="py-6 text-center">
+      <div class="text-3xl mb-2">🟦</div>
+      <p class="font-medium">Assento livre</p>
+      <p class="text-xs text-slate-500">Disponível em {{ data }}.</p>
+    </div>
+  {% endif %}
+</div>

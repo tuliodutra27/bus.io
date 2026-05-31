@@ -1,0 +1,37 @@
+[x-cloak] { display: none !important; }
+
+.seat-map {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.seat-row {
+  display: grid;
+  grid-template-columns: 44px 44px 28px 44px 44px;
+  gap: 8px;
+  align-items: center;
+}
+
+.aisle { width: 28px; }
+
+.seat {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform .08s ease, box-shadow .08s ease;
+}
+.seat:hover { transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0,0,0,.18); }
+
+.seat--livre   { background: #0f2a4a; color: #cfe2ff; }       /* navy, como o "Livre" da referência */
+.seat--ocupado { background: #e2e8f0; color: #475569; border-color: #cbd5e1; }
+.seat--extra   { background: #f59e0b; color: #1f2937; }       /* hora extra em destaque */
+.seat--vazio   { visibility: hidden; }
+.seat--alvo    { outline: 2px dashed #16a34a; }

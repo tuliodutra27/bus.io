@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}bus.io{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link rel="stylesheet" href="/static/css/app.css">
+  <script>
+    document.addEventListener('alpine:init', () => {
+      Alpine.store('modal', { open: false });
+    });
+  </script>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen">
+  <header class="bg-slate-900 text-white">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center gap-6">
+      <a href="/" class="text-xl font-bold tracking-tight">bus<span class="text-sky-400">.io</span></a>
+      <nav class="flex gap-4 text-sm">
+        <a href="/" class="hover:text-sky-300">Painel</a>
+        <a href="/hora-extra" class="hover:text-sky-300">Hora extra</a>
+      </nav>
+      <span class="ml-auto text-xs text-slate-400">Porto do Açu • Logística de fretados</span>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-6">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Modal global (detalhe do assento) -->
+  <div x-data x-show="$store.modal.open" x-cloak
+       @keydown.escape.window="$store.modal.open=false"
+       class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+       @click.self="$store.modal.open=false">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md">
+      <div id="modal-content"></div>
+    </div>
+  </div>
+</body>
+</html>
