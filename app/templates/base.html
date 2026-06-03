@@ -12,9 +12,23 @@
     document.addEventListener('alpine:init', () => {
       Alpine.store('modal', { open: false });
     });
+
+    // Exibe mensagem de erro para respostas HTMX não-2xx que não seriam trocadas
+    document.addEventListener('htmx:responseError', function (evt) {
+      var status = evt.detail.xhr.status;
+      var msg = status === 403
+        ? 'Sem permissão para realizar esta ação.'
+        : 'Erro ao processar a requisição (HTTP ' + status + ').';
+      var target = evt.detail.target;
+      if (target) {
+        target.innerHTML =
+          '<div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 text-sm">' + msg + '</div>';
+      }
+    });
   </script>
 </head>
-<body class="bg-slate-100 text-slate-800 min-h-screen">
+<!-- x-data no body garante que @click e outras diretivas Alpine funcionem em qualquer elemento da página -->
+<body x-data class="bg-slate-100 text-slate-800 min-h-screen">
   <header class="bg-slate-900 text-white">
     <div class="max-w-6xl mx-auto px-4 py-3 flex items-center gap-6">
       <a href="/" class="text-xl font-bold tracking-tight">bus<span class="text-sky-400">.io</span></a>
@@ -41,12 +55,12 @@
     {% block content %}{% endblock %}
   </main>
 
-  <!-- Modal global (detalhe do assento) -->
-  <div x-data x-show="$store.modal.open" x-cloak
+  <!-- Modal global (detalhe do assento / mapa rápido) -->
+  <div x-show="$store.modal.open" x-cloak
        @keydown.escape.window="$store.modal.open=false"
        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
        @click.self="$store.modal.open=false">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
       <div id="modal-content"></div>
     </div>
   </div>

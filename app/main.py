@@ -27,6 +27,14 @@ async def handle_nao_autenticado(request: Request, exc: NaoAutenticado):
 
 @app.exception_handler(SemPermissao)
 async def handle_sem_permissao(request: Request, exc: SemPermissao):
+    # Requisições HTMX recebem conteúdo inline para trocar no alvo (HTMX descarta 4xx por padrão)
+    if request.headers.get("HX-Request"):
+        return HTMLResponse(
+            content='<div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 text-sm max-w-2xl">'
+                    'Sem permissão para realizar esta ação.'
+                    '</div>',
+            status_code=200,
+        )
     return HTMLResponse(
         content="""
         <!DOCTYPE html><html lang="pt-br"><head><meta charset="utf-8">

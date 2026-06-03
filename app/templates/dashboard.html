@@ -5,7 +5,7 @@
 <div class="flex items-center justify-between">
   <div>
     <h1 class="text-2xl font-bold">Painel de ônibus</h1>
-    <p class="text-sm text-slate-500">Ocupação de hoje ({{ hoje }}) · clique em um ônibus para ver o mapa</p>
+    <p class="text-sm text-slate-500">Ocupação de hoje ({{ hoje }}) · clique em um card para ver o mapa de assentos</p>
   </div>
   <a href="/hora-extra" class="bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
     + Marcar hora extra
@@ -15,7 +15,12 @@
 <div class="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
   {% for card in cards %}
     {% set o = card.onibus %}
-    <a href="/onibus/{{ o.id }}" class="block bg-white rounded-xl shadow-sm hover:shadow-md transition p-4">
+    <div class="block bg-white rounded-xl shadow-sm hover:shadow-md transition p-4 cursor-pointer"
+         hx-get="/onibus/{{ o.id }}/mapa-parcial?data={{ hoje }}"
+         hx-target="#modal-content"
+         hx-swap="innerHTML"
+         @click="$store.modal.open=true">
+
       <div class="flex items-center justify-between">
         <span class="text-lg font-bold">{{ o.identificador }}</span>
         {% if o.tipo.value == 'admin' %}
@@ -40,7 +45,7 @@
       <div class="mt-2 h-2 bg-slate-100 rounded overflow-hidden">
         <div class="h-full bg-slate-600" style="width: {{ (card.ocupados / card.total * 100) if card.total else 0 }}%"></div>
       </div>
-    </a>
+    </div>
   {% endfor %}
 </div>
 {% endblock %}

@@ -1,0 +1,52 @@
+{% set modo = "view" %}
+{% set colaborador_id = 0 %}
+{% set o = mapa.onibus %}
+
+<div class="p-5">
+  <div class="flex items-start justify-between mb-4">
+    <div>
+      <h3 class="text-lg font-bold">
+        {{ o.identificador }}
+        {% if o.exemplo %}
+          <span class="text-xs align-middle bg-amber-100 text-amber-800 px-2 py-0.5 rounded ml-1">exemplo</span>
+        {% endif %}
+      </h3>
+      <p class="text-xs text-slate-500 mt-0.5">
+        {{ 'Administrativo · 50 lugares' if o.tipo.value == 'admin' else 'Turno · 30 lugares' }}
+        · {{ o.rota.cidade if o.rota else '—' }}
+      </p>
+      <p class="text-xs text-slate-400">{{ o.rota.nome if o.rota else 'sem rota' }} · {{ data }}</p>
+    </div>
+    <button type="button" class="text-slate-400 hover:text-slate-700 text-xl leading-none"
+            @click="$store.modal.open=false">&times;</button>
+  </div>
+
+  <div class="flex items-center gap-5 text-sm mb-4">
+    <span><b class="text-emerald-600 text-xl">{{ mapa.livres }}</b> <span class="text-slate-500">livres</span></span>
+    <span><b class="text-slate-700 text-xl">{{ mapa.ocupados }}</b> <span class="text-slate-500">ocupados</span></span>
+    <span class="text-slate-400">de {{ mapa.total }}</span>
+  </div>
+
+  {% if o.exemplo %}
+    <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2 mb-4">
+      Ônibus de exibição — sem roster real cadastrado.
+    </p>
+  {% else %}
+    <div class="inline-block mb-3">
+      {% include "partials/seat_map.html" %}
+    </div>
+    <p class="text-xs text-slate-400 mb-4">Clique em um assento para ver os dados do colaborador.</p>
+  {% endif %}
+
+  <div class="flex justify-between items-center pt-3 border-t border-slate-100">
+    <div class="flex items-center gap-3 text-xs text-slate-400">
+      <span class="flex items-center gap-1"><span class="seat seat--livre" style="width:14px;height:14px;display:inline-block"></span> Livre</span>
+      <span class="flex items-center gap-1"><span class="seat seat--ocupado" style="width:14px;height:14px;display:inline-block"></span> Fixo</span>
+      <span class="flex items-center gap-1"><span class="seat seat--extra" style="width:14px;height:14px;display:inline-block"></span> Extra</span>
+    </div>
+    <a href="/onibus/{{ o.id }}?data={{ data }}"
+       class="text-sm text-sky-600 hover:underline font-medium">
+      Ver página completa →
+    </a>
+  </div>
+</div>

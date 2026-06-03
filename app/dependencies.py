@@ -16,10 +16,15 @@ def require_login(request: Request) -> dict:
     username = request.session.get("username")
     if not username:
         raise NaoAutenticado()
+    role = request.session.get("role")
+    if role is None:
+        # Sessão antiga sem role — força novo login para re-autenticar com nível correto
+        request.session.clear()
+        raise NaoAutenticado()
     return {
         "username": username,
         "nome": request.session.get("nome", username),
-        "role": request.session.get("role", "viewer"),
+        "role": role,
     }
 
 

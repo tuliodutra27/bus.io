@@ -42,6 +42,28 @@ def ver_mapa(
     )
 
 
+@router.get("/{onibus_id}/mapa-parcial")
+def mapa_parcial(
+    onibus_id: int,
+    request: Request,
+    data: str | None = None,
+    usuario: dict = Depends(require_login),
+    db: Session = Depends(get_db),
+):
+    """Partial HTMX: mapa de assentos para exibição no modal do dashboard."""
+    onibus = db.get(Onibus, onibus_id)
+    if not onibus:
+        raise HTTPException(status_code=404, detail="Ônibus não encontrado")
+
+    dia = _parse_data(data)
+    mapa = ocupacao.montar_mapa(db, onibus, dia)
+
+    return templates.TemplateResponse(
+        "partials/onibus_mapa_parcial.html",
+        {"request": request, "mapa": mapa, "data": dia.isoformat(), "usuario": usuario},
+    )
+
+
 @router.get("/{onibus_id}/assento/{assento_id}")
 def detalhe_assento(
     onibus_id: int,
