@@ -1,0 +1,28 @@
+{% for c in colaboradores %}
+<tr class="hover:bg-slate-50 transition-colors">
+  <td class="px-4 py-3 font-medium text-slate-800">{{ c.nome }}</td>
+  <td class="px-4 py-3">
+    <span class="inline-block px-2 py-0.5 rounded text-xs font-medium
+      {% if c.empresa == 'ALISEO' %}bg-sky-50 text-sky-700{% else %}bg-amber-50 text-amber-700{% endif %}">
+      {{ c.empresa }}
+    </span>
+  </td>
+  <td class="px-4 py-3 text-slate-600">{{ c.setor or '—' }}</td>
+  <td class="px-4 py-3">
+    <span class="text-xs {% if c.regime.value == 'admin' %}text-indigo-600{% else %}text-orange-600{% endif %}">
+      {{ c.regime.value }}
+    </span>
+  </td>
+  <td class="px-4 py-3 text-slate-500">{{ c.bairro or c.cidade }}</td>
+  <td class="px-4 py-3 text-right">
+    <a href="/colaboradores/{{ c.id }}"
+       class="text-sky-600 hover:text-sky-800 text-xs font-medium hover:underline">
+      Gerenciar alocações →
+    </a>
+  </td>
+</tr>
+{% else %}
+<tr>
+  <td colspan="6" class="px-4 py-8 text-center text-slate-400 text-sm">Nenhum colaborador encontrado.</td>
+</tr>
+{% endfor %}

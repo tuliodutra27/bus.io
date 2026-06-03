@@ -118,6 +118,7 @@ class Colaborador(Base):
     regime = Column(Enum(Regime), nullable=False)
     cidade = Column(String(120), nullable=False)
     bairro = Column(String(120), nullable=True)
+    empresa = Column(String(100), nullable=False, default="ALISEO")
     rota_id = Column(Integer, ForeignKey("rotas.id"), nullable=True)
 
     rota = relationship("Rota", back_populates="colaboradores")

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Colaboradores — bus.io{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold">Colaboradores</h1>
+<p class="text-sm text-slate-500 mt-1">Busque por nome ou filtre por empresa para gerenciar alocações de ônibus.</p>
+
+<!-- Filtros -->
+<div class="mt-5 bg-white rounded-xl shadow-sm p-4 flex flex-wrap gap-3 items-end max-w-3xl">
+  <label class="text-sm flex-1 min-w-[200px]">
+    <span class="block text-slate-500 mb-1">Buscar por nome</span>
+    <input type="text" name="q" value="{{ q }}"
+           class="border rounded px-3 py-2 w-full text-sm"
+           placeholder="Nome do colaborador…"
+           hx-get="/colaboradores/buscar"
+           hx-target="#lista-colaboradores"
+           hx-swap="innerHTML"
+           hx-trigger="input changed delay:300ms"
+           hx-include="[name='empresa_filtro']">
+  </label>
+  <label class="text-sm">
+    <span class="block text-slate-500 mb-1">Empresa</span>
+    <select name="empresa_filtro"
+            class="border rounded px-2 py-2 text-sm"
+            hx-get="/colaboradores/buscar"
+            hx-target="#lista-colaboradores"
+            hx-swap="innerHTML"
+            hx-trigger="change"
+            hx-include="[name='q']">
+      <option value="">Todas</option>
+      {% for emp in empresas %}
+        <option value="{{ emp }}" {% if emp == empresa_filtro %}selected{% endif %}>{{ emp }}</option>
+      {% endfor %}
+    </select>
+  </label>
+</div>
+
+<!-- Tabela -->
+<div class="mt-5 bg-white rounded-xl shadow-sm overflow-hidden max-w-5xl">
+  <table class="w-full text-sm">
+    <thead class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+      <tr>
+        <th class="px-4 py-3 text-left">Nome</th>
+        <th class="px-4 py-3 text-left">Empresa</th>
+        <th class="px-4 py-3 text-left">Setor / Cargo</th>
+        <th class="px-4 py-3 text-left">Regime</th>
+        <th class="px-4 py-3 text-left">Bairro</th>
+        <th class="px-4 py-3"></th>
+      </tr>
+    </thead>
+    <tbody id="lista-colaboradores" class="divide-y divide-slate-100">
+      {% include "partials/colaboradores_lista.html" %}
+    </tbody>
+  </table>
+  {% if not colaboradores %}
+    <p class="text-center text-slate-400 text-sm py-8">Nenhum colaborador encontrado.</p>
+  {% endif %}
+</div>
+{% endblock %}

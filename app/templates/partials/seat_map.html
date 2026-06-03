@@ -1,4 +1,4 @@
-{% macro render_seat(a, modo, data, onibus_id, colaborador_id) %}
+{% macro render_seat(a, modo, data, onibus_id, colaborador_id, alocar_letra) %}
   {% if a is none %}
     <div class="seat seat--vazio"></div>
   {% elif a.status == 'ocupado' %}
@@ -11,7 +11,7 @@
               hx-target="#modal-content" hx-swap="innerHTML"
               @click="$store.modal.open=true">{{ a.numero }}</button>
     {% else %}
-      <div class="seat {{ cls }}" title="{{ a.colaborador.nome }}">{{ a.numero }}</div>
+      <div class="seat {{ cls }}" title="{{ a.colaborador.nome if a.colaborador else '' }}">{{ a.numero }}</div>
     {% endif %}
   {% else %}
     {% if modo == 'marcar' %}
@@ -22,6 +22,14 @@
               hx-post="/hora-extra/marcar"
               hx-vals='{"colaborador_id": {{ colaborador_id }}, "assento_id": {{ a.id }}, "data": "{{ data }}"}'
               hx-target="#he-resultado" hx-swap="innerHTML">{{ a.numero }}</button>
+    {% elif modo == 'alocar' %}
+      <button type="button"
+              class="seat seat--livre seat--alvo"
+              title="Alocar assento {{ a.numero }}"
+              hx-confirm="Confirmar alocação do assento {{ a.numero }}?"
+              hx-post="/colaboradores/{{ colaborador_id }}/alocar"
+              hx-vals='{"assento_id": {{ a.id }}, "turno_letra": "{{ alocar_letra }}", "onibus_id": {{ onibus_id }}}'
+              hx-target="#alocacoes-section" hx-swap="innerHTML">{{ a.numero }}</button>
     {% else %}
       <button type="button"
               class="seat seat--livre"
@@ -32,6 +40,8 @@
   {% endif %}
 {% endmacro %}
 
+{% set _al = alocar_letra if alocar_letra is defined else 'ADM' %}
+
 <div class="seat-map">
   {% for fila, assentos in mapa.assentos|groupby('fila') %}
     {% set a1 = assentos|selectattr('coluna','equalto',1)|first %}
@@ -39,11 +49,11 @@
     {% set a3 = assentos|selectattr('coluna','equalto',3)|first %}
     {% set a4 = assentos|selectattr('coluna','equalto',4)|first %}
     <div class="seat-row">
-      {{ render_seat(a1 or none, modo, data, mapa.onibus.id, colaborador_id) }}
-      {{ render_seat(a2 or none, modo, data, mapa.onibus.id, colaborador_id) }}
+      {{ render_seat(a1 or none, modo, data, mapa.onibus.id, colaborador_id, _al) }}
+      {{ render_seat(a2 or none, modo, data, mapa.onibus.id, colaborador_id, _al) }}
       <div class="aisle"></div>
-      {{ render_seat(a3 or none, modo, data, mapa.onibus.id, colaborador_id) }}
-      {{ render_seat(a4 or none, modo, data, mapa.onibus.id, colaborador_id) }}
+      {{ render_seat(a3 or none, modo, data, mapa.onibus.id, colaborador_id, _al) }}
+      {{ render_seat(a4 or none, modo, data, mapa.onibus.id, colaborador_id, _al) }}
     </div>
   {% endfor %}
 </div>

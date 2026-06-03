@@ -1,0 +1,13 @@
+{% set modo = 'alocar' %}
+{% set alocar_letra = alocar_letra %}
+
+<div class="text-xs text-slate-500 mb-2">
+  <b class="text-emerald-600">{{ mapa.livres }}</b> livres ·
+  <b class="text-slate-700">{{ mapa.ocupados }}</b> ocupados
+</div>
+
+{% include "partials/seat_map.html" %}
+
+<p class="text-xs text-slate-400 mt-2">
+  Clique em um assento livre para alocar {{ colaborador.nome }}.
+</p>

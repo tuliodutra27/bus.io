@@ -1,8 +1,7 @@
 """Popula o banco com dados de exemplo.
 
-MVP: 2 ônibus 100% funcionais (1 administrativo + 1 de turno na mesma rota)
-e os demais apenas para exibição.
-Frota real: 4 admin + 4 turno.
+Frota: 4 admin + 4 turno. Apenas ADM-01 e TUR-01 têm roster completo;
+os demais são exibição (exemplo=True).
 """
 
 from sqlalchemy.orm import Session
@@ -36,33 +35,32 @@ def _gerar_assentos(onibus: Onibus) -> None:
 
 
 # Colaboradores fixos do ônibus ADMINISTRATIVO funcional (ADM-01)
-# (nome, matricula, setor, bairro, num_assento)
+# (nome, matricula, setor, bairro, num_assento, empresa)
 COLAB_ADMIN = [
-    ("Ana Paula Ferreira", "ADM1001", "Financeiro", "Centro", 3),
-    ("Bruno Carvalho Lima", "ADM1002", "RH", "Parque Tamandaré", 4),
-    ("Carla Souza Mendes", "ADM1003", "Compras", "Pelinca", 7),
-    ("Diego Nascimento", "ADM1004", "TI", "Jardim Carioca", 8),
-    ("Eduarda Ramos", "ADM1005", "Jurídico", "Centro", 11),
-    ("Felipe Antunes", "ADM1006", "Engenharia", "Flamboyant", 12),
-    ("Gabriela Pinto", "ADM1007", "SSMA", "Caju", 15),
-    ("Henrique Barbosa", "ADM1008", "Financeiro", "Centro", 16),
-    ("Isabela Cardoso", "ADM1009", "Suprimentos", "Pelinca", 19),
-    ("João Vitor Teixeira", "ADM1010", "Engenharia", "Parque Califórnia", 20),
-    ("Larissa Moreira", "ADM1011", "RH", "Turf Club", 23),
-    ("Marcelo Drummond", "ADM1012", "Planejamento", "Centro", 24),
+    ("Ana Paula Ferreira",   "ADM1001", "Financeiro",   "Centro",            3,  "ALISEO"),
+    ("Bruno Carvalho Lima",  "ADM1002", "RH",           "Parque Tamandaré",  4,  "ALISEO"),
+    ("Carla Souza Mendes",   "ADM1003", "Compras",      "Pelinca",           7,  "ALISEO"),
+    ("Diego Nascimento",     "ADM1004", "TI",           "Jardim Carioca",    8,  "ALISEO"),
+    ("Eduarda Ramos",        "ADM1005", "Jurídico",     "Centro",            11, "ALISEO"),
+    ("Felipe Antunes",       "ADM1006", "Engenharia",   "Flamboyant",        12, "ALISEO"),
+    ("Gabriela Pinto",       "ADM1007", "SSMA",         "Caju",              15, "ALISEO"),
+    ("Henrique Barbosa",     "ADM1008", "Financeiro",   "Centro",            16, "ALISEO"),
+    ("Isabela Cardoso",      "ADM1009", "Suprimentos",  "Pelinca",           19, "ALISEO"),
+    ("João Vitor Teixeira",  "ADM1010", "Engenharia",   "Parque Califórnia", 20, "ALISEO"),
+    ("Larissa Moreira",      "ADM1011", "RH",           "Turf Club",         23, "ALISEO"),
+    ("Marcelo Drummond",     "ADM1012", "Planejamento", "Centro",            24, "ALISEO"),
 ]
 
 # Colaboradores fixos do ônibus de TURNO funcional (TUR-01)
-# Cada colaborador recebe uma letra de turno (A/B/C/D) em rodízio para demonstração.
-# Na importação real, a letra virá da planilha.
+# (nome, matricula, setor, bairro, num_assento, letra, empresa)
 COLAB_TURNO = [
-    ("Nícolas Pereira",    "TUR2001", "Operação",   "Centro",            2,  "A"),
-    ("Olívia Santana",     "TUR2002", "Operação",   "Pelinca",           5,  "B"),
-    ("Paulo Roberto Dias", "TUR2003", "Manutenção", "Jardim Carioca",    6,  "C"),
-    ("Quésia Almeida",     "TUR2004", "Operação",   "Flamboyant",        9,  "D"),
-    ("Rafael Monteiro",    "TUR2005", "Manutenção", "Caju",              10, "A"),
-    ("Sabrina Lopes",      "TUR2006", "Operação",   "Centro",            13, "B"),
-    ("Thiago Fontes",      "TUR2007", "Logística",  "Parque Califórnia", 14, "C"),
+    ("Nícolas Pereira",     "TUR2001", "Operação",   "Centro",            2,  "A", "ALISEO"),
+    ("Olívia Santana",      "TUR2002", "Operação",   "Pelinca",           5,  "B", "ALISEO"),
+    ("Paulo Roberto Dias",  "TUR2003", "Manutenção", "Jardim Carioca",    6,  "C", "ALISEO"),
+    ("Quésia Almeida",      "TUR2004", "Operação",   "Flamboyant",        9,  "D", "Terceirizada ABC"),
+    ("Rafael Monteiro",     "TUR2005", "Manutenção", "Caju",              10, "A", "Terceirizada ABC"),
+    ("Sabrina Lopes",       "TUR2006", "Operação",   "Centro",            13, "B", "Terceirizada XYZ"),
+    ("Thiago Fontes",       "TUR2007", "Logística",  "Parque Califórnia", 14, "C", "ALISEO"),
 ]
 
 
@@ -104,11 +102,11 @@ def seed(db: Session) -> None:
     # --- Colaboradores + alocação fixa no ADM-01 (turno_letra = LETRA_ADM) ---
     def _aloca_admin(lista, onibus):
         mapa_assentos = {a.numero: a for a in onibus.assentos}
-        for nome, matricula, setor, bairro, num_assento in lista:
+        for nome, matricula, setor, bairro, num_assento, empresa in lista:
             colab = Colaborador(
                 nome=nome, matricula=matricula, setor=setor,
                 telefone="(22) 99999-0000", regime=Regime.admin, cidade=CAMPOS,
-                bairro=bairro, rota_id=rota_campos.id,
+                bairro=bairro, empresa=empresa, rota_id=rota_campos.id,
             )
             db.add(colab)
             db.flush()
@@ -124,11 +122,11 @@ def seed(db: Session) -> None:
     # --- Colaboradores + alocação fixa no TUR-01 (com turno_letra A/B/C/D) ---
     def _aloca_turno(lista, onibus):
         mapa_assentos = {a.numero: a for a in onibus.assentos}
-        for nome, matricula, setor, bairro, num_assento, letra in lista:
+        for nome, matricula, setor, bairro, num_assento, letra, empresa in lista:
             colab = Colaborador(
                 nome=nome, matricula=matricula, setor=setor,
                 telefone="(22) 99999-0000", regime=Regime.turno, cidade=CAMPOS,
-                bairro=bairro, rota_id=rota_campos.id,
+                bairro=bairro, empresa=empresa, rota_id=rota_campos.id,
             )
             db.add(colab)
             db.flush()

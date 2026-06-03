@@ -55,6 +55,7 @@
       <nav class="flex gap-4 text-sm">
         <a href="/" class="hover:text-sky-300">Painel</a>
         <a href="/hora-extra" class="hover:text-sky-300">Hora extra</a>
+        <a href="/colaboradores" class="hover:text-sky-300">Colaboradores</a>
       </nav>
       <div class="ml-auto flex items-center gap-3 text-xs text-slate-400">
         <span>Porto do Açu • Logística de fretados</span>
@@ -90,7 +91,7 @@
        @keydown.escape.window="$store.confirmar.cancelar()"
        class="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6">
-      <h3 class="text-base font-semibold text-slate-800 mb-2">Confirmar agendamento</h3>
+      <h3 class="text-base font-semibold text-slate-800 mb-2">Confirmar ação</h3>
       <p class="text-sm text-slate-600 mb-6" x-text="$store.confirmar.texto"></p>
       <div class="flex gap-3 justify-end">
         <button @click="$store.confirmar.cancelar()"

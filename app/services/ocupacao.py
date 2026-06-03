@@ -67,6 +67,7 @@ def _colaborador_dict(colab: Colaborador) -> dict:
         "regime": colab.regime.value if colab.regime else None,
         "cidade": colab.cidade,
         "bairro": colab.bairro,
+        "empresa": colab.empresa,
     }
 
 
@@ -150,6 +151,49 @@ def montar_mapa(
         total=len(views),
         ocupados=ocupados,
         turno_letra=letra_filtro if onibus.tipo == TipoOnibus.micro else None,
+    )
+
+
+def mapa_alocacao_fixa(db: Session, onibus: Onibus, turno_letra: str) -> MapaView:
+    """Mapa baseado apenas em AlocacaoFixa, sem exceções de data. Usado para gestão de roster."""
+    if onibus.tipo == TipoOnibus.admin:
+        turno_letra = LETRA_ADM
+
+    assentos = (
+        db.query(Assento)
+        .filter(Assento.onibus_id == onibus.id)
+        .order_by(Assento.numero)
+        .all()
+    )
+    fixos = {
+        a.assento_id: a.colaborador
+        for a in db.query(AlocacaoFixa)
+        .join(Assento)
+        .filter(
+            Assento.onibus_id == onibus.id,
+            AlocacaoFixa.turno_letra == turno_letra,
+        )
+        .all()
+    }
+
+    views: list[AssentoView] = []
+    ocupados = 0
+    for a in assentos:
+        view = AssentoView(id=a.id, numero=a.numero, fila=a.fila, coluna=a.coluna, lado=a.lado)
+        colab = fixos.get(a.id)
+        if colab:
+            view.status = "ocupado"
+            view.origem = "fixo"
+            view.colaborador = _colaborador_dict(colab)
+            ocupados += 1
+        views.append(view)
+
+    return MapaView(
+        onibus=onibus,
+        assentos=views,
+        total=len(views),
+        ocupados=ocupados,
+        turno_letra=turno_letra if onibus.tipo == TipoOnibus.micro else None,
     )
 
 

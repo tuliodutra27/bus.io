@@ -1,0 +1,111 @@
+<!-- Mensagens -->
+{% if mensagem %}
+  <div class="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg p-3 text-sm">
+    {{ mensagem }}
+  </div>
+{% endif %}
+{% if erro %}
+  <div class="mb-4 bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm">
+    {{ erro }}
+  </div>
+{% endif %}
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+  <!-- Alocações atuais -->
+  <div>
+    <h2 class="text-base font-semibold text-slate-700 mb-3">Alocações atuais</h2>
+    {% if alocacoes %}
+      <div class="space-y-2">
+        {% for aloc in alocacoes %}
+          <div class="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-4 py-3">
+            <div>
+              <p class="font-medium text-slate-800 text-sm">{{ aloc.assento.onibus.identificador }}</p>
+              <p class="text-xs text-slate-500">
+                Assento {{ aloc.assento.numero }}
+                {% if aloc.turno_letra != 'ADM' %} · Letra {{ aloc.turno_letra }}{% endif %}
+              </p>
+            </div>
+            {% if usuario.role in ('admin', 'logistica') %}
+            <button
+                hx-post="/colaboradores/{{ colaborador.id }}/alocacao/{{ aloc.id }}/remover"
+                hx-target="#alocacoes-section" hx-swap="innerHTML"
+                hx-confirm="Remover alocação do assento {{ aloc.assento.numero }} ({{ aloc.assento.onibus.identificador }})?"
+                class="text-xs text-red-500 hover:text-red-700 font-medium transition-colors">
+              Remover
+            </button>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="text-sm text-slate-400">Nenhuma alocação cadastrada.</p>
+    {% endif %}
+  </div>
+
+  <!-- Adicionar nova alocação -->
+  {% if usuario.role in ('admin', 'logistica') %}
+  <div>
+    <h2 class="text-base font-semibold text-slate-700 mb-3">Adicionar alocação</h2>
+
+    <div x-data="{ tipo: '{{ onibus_sel.tipo.value if onibus_sel else '' }}' }">
+      <form hx-get="/colaboradores/{{ colaborador.id }}/assentos-livres"
+            hx-target="#mapa-novo" hx-swap="innerHTML"
+            hx-trigger="change">
+
+        <label class="block text-xs text-slate-500 mb-1">Ônibus</label>
+        <select name="onibus_id"
+                class="border rounded px-2 py-2 text-sm w-full"
+                @change="tipo = $event.target.options[$event.target.selectedIndex].dataset.tipo || ''">
+          <option value="">Selecione um ônibus…</option>
+          {% for o in todos_onibus %}
+            <option value="{{ o.id }}"
+                    data-tipo="{{ o.tipo.value }}"
+                    {% if onibus_sel and o.id == onibus_sel.id %}selected{% endif %}>
+              {{ o.identificador }} ({{ o.tipo.value }})
+            </option>
+          {% endfor %}
+        </select>
+
+        <!-- Letra — visível apenas para micro-ônibus de turno -->
+        <div x-show="tipo === 'micro'" class="mt-3">
+          <label class="block text-xs text-slate-500 mb-1">Letra do turno</label>
+          <div class="flex gap-2">
+            {% for l in letras_turno %}
+              <label class="flex items-center gap-1 cursor-pointer text-sm">
+                <input type="radio" name="letra" value="{{ l }}"
+                       {% if l == letra_sel %}checked{% endif %}
+                       class="accent-sky-600">
+                <span class="font-medium">{{ l }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Hidden para admin buses (letra sempre ADM) -->
+        <input type="hidden" name="letra" value="ADM" x-show="tipo !== 'micro'">
+
+      </form>
+
+      <!-- Mapa de assentos -->
+      <div id="mapa-novo" class="mt-4">
+        {% if mapa_novo %}
+          {% set modo = 'alocar' %}
+          {% set alocar_letra = letra_sel %}
+          <div class="text-xs text-slate-500 mb-2">
+            <b class="text-emerald-600">{{ mapa_novo.livres }}</b> livres ·
+            <b class="text-slate-700">{{ mapa_novo.ocupados }}</b> ocupados
+          </div>
+          {% include "partials/seat_map.html" %}
+          <p class="text-xs text-slate-400 mt-2">
+            Clique em um assento livre para alocar {{ colaborador.nome }}.
+          </p>
+        {% else %}
+          <p class="text-sm text-slate-400">Selecione um ônibus acima para ver os assentos disponíveis.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+</div>

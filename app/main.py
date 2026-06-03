@@ -6,7 +6,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.config import settings
 from app.db import Base, SessionLocal, engine, wait_for_db
 from app.dependencies import NaoAutenticado, SemPermissao
-from app.routers import auth, dashboard, hora_extra, onibus
+from app.routers import auth, colaboradores, dashboard, hora_extra, onibus
 from app.services.seed import seed
 
 app = FastAPI(title=settings.APP_NAME)
@@ -18,6 +18,7 @@ app.include_router(auth.router)
 app.include_router(dashboard.router)
 app.include_router(onibus.router)
 app.include_router(hora_extra.router)
+app.include_router(colaboradores.router)
 
 
 @app.exception_handler(NaoAutenticado)
