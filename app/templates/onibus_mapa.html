@@ -18,14 +18,42 @@
       {{ tipo_label }} · {{ o.rota.cidade if o.rota else "—" }} · {{ o.rota.nome if o.rota else "sem rota" }}
     </p>
   </div>
-  <form method="get" class="flex items-end gap-2">
+  <form method="get" class="flex items-end gap-2 flex-wrap">
     <label class="text-sm">
       <span class="block text-slate-500">Data</span>
       <input type="date" name="data" value="{{ data }}"
              class="border rounded px-2 py-1" onchange="this.form.submit()">
     </label>
+    {% if o.tipo.value == "micro" %}
+    <input type="hidden" name="letra" value="{{ mapa.turno_letra }}">
+    {% endif %}
   </form>
 </div>
+
+{% if o.tipo.value == "micro" %}
+<div class="mt-4 flex items-center gap-2 flex-wrap">
+  <span class="text-sm text-slate-600 font-medium">Ciclo de turno:</span>
+  {% for l in letras_turno %}
+    {% if l == mapa.turno_letra %}
+      <span class="px-3 py-1 rounded-lg text-sm font-bold bg-slate-800 text-white">{{ l }}</span>
+    {% else %}
+      <a href="/onibus/{{ o.id }}?data={{ data }}&letra={{ l }}"
+         class="px-3 py-1 rounded-lg text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 transition">{{ l }}</a>
+    {% endif %}
+  {% endfor %}
+  {% if usuario.role in ('admin', 'logistica') %}
+  <form method="post" action="/onibus/turno/letra" class="flex items-center gap-2 ml-2">
+    <input type="hidden" name="letra" value="{{ mapa.turno_letra }}">
+    <input type="hidden" name="redirect_url" value="/onibus/{{ o.id }}?data={{ data }}">
+    <button type="submit"
+            class="text-xs text-sky-600 hover:underline"
+            title="Definir {{ mapa.turno_letra }} como letra ativa global">
+      Definir letra {{ mapa.turno_letra }} como ativa
+    </button>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
 
 <div class="mt-4 grid grid-cols-3 gap-3 max-w-md">
   <div class="bg-white rounded-lg p-3 text-center shadow-sm">

@@ -38,6 +38,21 @@ class StatusSolicitacao(str, enum.Enum):
     recusada = "recusada"
 
 
+# Letras do ciclo de turno
+LETRAS_TURNO = ("A", "B", "C", "D")
+# Sentinel usado nos ônibus administrativos (garante unicidade no constraint composto)
+LETRA_ADM = "ADM"
+
+
+class Configuracao(Base):
+    """Configurações globais do sistema em formato chave-valor."""
+
+    __tablename__ = "configuracoes"
+
+    chave = Column(String(80), primary_key=True)
+    valor = Column(String(200), nullable=False)
+
+
 class Rota(Base):
     __tablename__ = "rotas"
 
@@ -86,8 +101,8 @@ class Assento(Base):
     lado = Column(String(10), nullable=False)  # "esq" | "dir"
 
     onibus = relationship("Onibus", back_populates="assentos")
-    alocacao = relationship(
-        "AlocacaoFixa", back_populates="assento", uselist=False,
+    alocacoes = relationship(
+        "AlocacaoFixa", back_populates="assento",
         cascade="all, delete-orphan",
     )
 
@@ -109,15 +124,26 @@ class Colaborador(Base):
 
 
 class AlocacaoFixa(Base):
-    """Roster permanente: assento que o colaborador ocupa no dia a dia."""
+    """Roster permanente: assento que o colaborador ocupa regularmente.
+
+    turno_letra:
+      - 'ADM' para ônibus administrativos (garante unicidade no constraint composto)
+      - 'A', 'B', 'C' ou 'D' para ônibus de turno (cada letra é um ciclo de escalas)
+    Um colaborador pode aparecer em mais de uma linha (múltiplos ônibus ou múltiplas letras).
+    """
 
     __tablename__ = "alocacoes_fixas"
+    __table_args__ = (
+        UniqueConstraint("assento_id", "turno_letra", name="uq_alocacao_assento_letra"),
+    )
 
     id = Column(Integer, primary_key=True)
-    assento_id = Column(Integer, ForeignKey("assentos.id"), nullable=False, unique=True)
+    assento_id = Column(Integer, ForeignKey("assentos.id"), nullable=False)
     colaborador_id = Column(Integer, ForeignKey("colaboradores.id"), nullable=False)
+    # 'ADM' para admin | 'A'/'B'/'C'/'D' para turno
+    turno_letra = Column(String(3), nullable=False, default=LETRA_ADM)
 
-    assento = relationship("Assento", back_populates="alocacao")
+    assento = relationship("Assento", back_populates="alocacoes")
     colaborador = relationship("Colaborador")
 
 

@@ -18,6 +18,7 @@
       <button type="button"
               class="seat seat--livre seat--alvo"
               title="Marcar assento {{ a.numero }}"
+              hx-confirm="Confirmar marcação do assento {{ a.numero }} para a data {{ data }}?"
               hx-post="/hora-extra/marcar"
               hx-vals='{"colaborador_id": {{ colaborador_id }}, "assento_id": {{ a.id }}, "data": "{{ data }}"}'
               hx-target="#he-resultado" hx-swap="innerHTML">{{ a.numero }}</button>

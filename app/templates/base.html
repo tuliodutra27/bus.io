@@ -11,9 +11,29 @@
   <script>
     document.addEventListener('alpine:init', () => {
       Alpine.store('modal', { open: false });
+
+      // Caixa de confirmação customizada para ações HTMX com hx-confirm
+      Alpine.store('confirmar', {
+        open: false,
+        texto: '',
+        _fn: null,
+        abrir(texto, fn) { this.texto = texto; this._fn = fn; this.open = true; },
+        ok()      { this.open = false; if (this._fn) this._fn(); this._fn = null; },
+        cancelar(){ this.open = false; this._fn = null; },
+      });
     });
 
-    // Exibe mensagem de erro para respostas HTMX não-2xx que não seriam trocadas
+    // Intercepta hx-confirm e usa o modal Alpine em vez do confirm() do browser
+    document.addEventListener('htmx:confirm', function (evt) {
+      if (!evt.detail.question) return;
+      evt.preventDefault();
+      Alpine.store('confirmar').abrir(
+        evt.detail.question,
+        function () { evt.detail.issueRequest(); }
+      );
+    });
+
+    // Exibe erro inline para respostas HTMX não-2xx
     document.addEventListener('htmx:responseError', function (evt) {
       var status = evt.detail.xhr.status;
       var msg = status === 403
@@ -62,6 +82,26 @@
        @click.self="$store.modal.open=false">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
       <div id="modal-content"></div>
+    </div>
+  </div>
+
+  <!-- Caixa de confirmação (z-[60] para sobrepor o modal) -->
+  <div x-show="$store.confirmar.open" x-cloak
+       @keydown.escape.window="$store.confirmar.cancelar()"
+       class="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6">
+      <h3 class="text-base font-semibold text-slate-800 mb-2">Confirmar agendamento</h3>
+      <p class="text-sm text-slate-600 mb-6" x-text="$store.confirmar.texto"></p>
+      <div class="flex gap-3 justify-end">
+        <button @click="$store.confirmar.cancelar()"
+                class="px-4 py-2 text-sm text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition">
+          Cancelar
+        </button>
+        <button @click="$store.confirmar.ok()"
+                class="px-4 py-2 text-sm bg-sky-600 hover:bg-sky-700 text-white font-medium rounded-lg transition">
+          Confirmar
+        </button>
+      </div>
     </div>
   </div>
 </body>

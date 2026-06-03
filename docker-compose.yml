@@ -4,16 +4,16 @@ services:
     container_name: busio_db
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-busio}
-      MYSQL_USER: ${MYSQL_USER:-busio}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-busio}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     ports:
       - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD:-rootpass}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -26,18 +26,21 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: mysql+pymysql://${MYSQL_USER:-busio}:${MYSQL_PASSWORD:-busio}@db:3306/${MYSQL_DATABASE:-busio}
-      SEED_ON_START: "true"
-      # Active Directory — ajuste no .env
-      LDAP_SERVER: ${LDAP_SERVER:-ldap://dc.aliseo.local}
-      LDAP_DOMAIN: ${LDAP_DOMAIN:-aliseo.local}
-      LDAP_BASE_DN: ${LDAP_BASE_DN:-DC=aliseo,DC=local}
-      # Grupos de acesso (CN do grupo no AD)
-      LDAP_GROUP_ADMIN: ${LDAP_GROUP_ADMIN:-GRP_App_Bus.io_Admin}
-      LDAP_GROUP_LOGISTICA: ${LDAP_GROUP_LOGISTICA:-GRP_App_Bus.io_Logistica}
-      LDAP_GROUP_VIEWER: ${LDAP_GROUP_VIEWER:-GRP_App_Bus.io_Viewer}
+      # Banco — lido diretamente do .env, sem defaults hardcoded
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_HOST: db
+      SEED_ON_START: ${SEED_ON_START:-true}
+      # Active Directory
+      LDAP_SERVER: ${LDAP_SERVER}
+      LDAP_DOMAIN: ${LDAP_DOMAIN}
+      LDAP_BASE_DN: ${LDAP_BASE_DN}
+      LDAP_GROUP_ADMIN: ${LDAP_GROUP_ADMIN}
+      LDAP_GROUP_LOGISTICA: ${LDAP_GROUP_LOGISTICA}
+      LDAP_GROUP_VIEWER: ${LDAP_GROUP_VIEWER}
       # Sessão
-      SESSION_SECRET: ${SESSION_SECRET:-dev-secret-troque-em-producao}
+      SESSION_SECRET: ${SESSION_SECRET}
     ports:
       - "8000:8000"
     volumes:

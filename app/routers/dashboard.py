@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.dependencies import require_login
-from app.models import Onibus
+from app.models import Onibus, TipoOnibus, LETRAS_TURNO
 from app.services import ocupacao
 from app.templating import templates
 
@@ -19,11 +19,13 @@ def index(
     db: Session = Depends(get_db),
 ):
     hoje = date.today()
+    letra_ativa = ocupacao.get_letra_ativa(db)
     onibus_list = db.query(Onibus).order_by(Onibus.tipo, Onibus.identificador).all()
 
     cards = []
     for o in onibus_list:
-        mapa = ocupacao.montar_mapa(db, o, hoje)
+        turno_letra = letra_ativa if o.tipo == TipoOnibus.micro else None
+        mapa = ocupacao.montar_mapa(db, o, hoje, turno_letra=turno_letra)
         cards.append(
             {
                 "onibus": o,
@@ -35,5 +37,12 @@ def index(
 
     return templates.TemplateResponse(
         "dashboard.html",
-        {"request": request, "cards": cards, "hoje": hoje.isoformat(), "usuario": usuario},
+        {
+            "request": request,
+            "cards": cards,
+            "hoje": hoje.isoformat(),
+            "usuario": usuario,
+            "letra_ativa": letra_ativa,
+            "letras_turno": LETRAS_TURNO,
+        },
     )
