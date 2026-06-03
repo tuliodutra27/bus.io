@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.dependencies import require_login
+from app.dependencies import require_login, require_logistica
 from app.models import (
     Colaborador,
     ExcecaoData,
@@ -68,6 +68,9 @@ def sugestao(
 
     mapa = ocupacao.montar_mapa(db, onibus_turno, dia) if onibus_turno else None
 
+    # Viewer só visualiza — não pode marcar assentos
+    modo_mapa = "view" if usuario["role"] == "viewer" else "marcar"
+
     return templates.TemplateResponse(
         "partials/hora_extra_resultado.html",
         {
@@ -76,6 +79,7 @@ def sugestao(
             "onibus": onibus_turno,
             "mapa": mapa,
             "data": dia.isoformat(),
+            "modo_mapa": modo_mapa,
             "erro": None if onibus_turno else "Nenhum ônibus de turno funcional encontrado para a rota deste colaborador.",
         },
     )
@@ -87,7 +91,7 @@ def marcar(
     colaborador_id: int = Form(...),
     assento_id: int = Form(...),
     data: str = Form(...),
-    usuario: dict = Depends(require_login),
+    usuario: dict = Depends(require_logistica),  # viewer não pode marcar
     db: Session = Depends(get_db),
 ):
     """Marca o assento do solicitante no ônibus de turno para a data."""
@@ -133,6 +137,7 @@ def marcar(
             "onibus": onibus_turno,
             "mapa": mapa,
             "data": dia.isoformat(),
+            "modo_mapa": "marcar",
             "mensagem": mensagem,
             "erro": None,
         },

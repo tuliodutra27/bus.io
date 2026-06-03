@@ -2,9 +2,13 @@
 
 Fluxo:
 1. Bind como username@domínio com a senha fornecida.
-2. Busca o objeto do usuário no AD (sAMAccountName).
-3. Verifica se o CN do grupo de acesso está em algum dos valores de memberOf.
-4. Retorna UsuarioAD com nome de exibição, ou None em caso de falha/sem permissão.
+2. Busca o objeto do usuário no AD (sAMAccountName) e lê o atributo memberOf.
+3. Determina o nível de acesso verificando os grupos em ordem de prioridade:
+   admin > logistica > viewer.
+4. Retorna UsuarioAD com nome e role, ou None se sem acesso.
+
+Os nomes dos grupos são lidos de variáveis de ambiente (config.py) — nunca
+hardcoded aqui.
 """
 
 from dataclasses import dataclass
@@ -14,18 +18,26 @@ from ldap3.core.exceptions import LDAPException
 
 from app.config import settings
 
+# Ordem de prioridade: quem está em admin não precisa estar em logistica ou viewer
+ROLES = [
+    ("admin",     settings.LDAP_GROUP_ADMIN),
+    ("logistica", settings.LDAP_GROUP_LOGISTICA),
+    ("viewer",    settings.LDAP_GROUP_VIEWER),
+]
+
 
 @dataclass
 class UsuarioAD:
     username: str
     nome: str
+    role: str  # "admin" | "logistica" | "viewer"
 
 
 def autenticar(username: str, password: str) -> UsuarioAD | None:
-    """Autentica no AD e verifica pertencimento ao grupo de acesso.
+    """Autentica no AD e devolve o nível de acesso do usuário.
 
     Retorna UsuarioAD em sucesso; None se credenciais inválidas, usuário não
-    encontrado ou fora do grupo GRP_App_Acessar_Bus.io.
+    encontrado ou sem nenhum grupo de acesso configurado.
     """
     if not username or not password:
         return None
@@ -48,15 +60,20 @@ def autenticar(username: str, password: str) -> UsuarioAD | None:
 
         entry = conn.entries[0]
         member_of = [str(dn).upper() for dn in entry.memberOf.values]
-        group_upper = settings.LDAP_GROUP.upper()
 
-        if not any(group_upper in dn for dn in member_of):
-            conn.unbind()
+        role = None
+        for role_name, group_cn in ROLES:
+            if any(group_cn.upper() in dn for dn in member_of):
+                role = role_name
+                break
+
+        conn.unbind()
+
+        if role is None:
             return None
 
         nome = str(entry.displayName) if entry.displayName else username
-        conn.unbind()
-        return UsuarioAD(username=username, nome=nome)
+        return UsuarioAD(username=username, nome=nome, role=role)
 
     except LDAPException:
         return None

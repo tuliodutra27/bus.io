@@ -18,8 +18,14 @@ class Settings:
     LDAP_SERVER: str = os.getenv("LDAP_SERVER", "ldap://dc.aliseo.local")
     LDAP_DOMAIN: str = os.getenv("LDAP_DOMAIN", "aliseo.local")
     LDAP_BASE_DN: str = os.getenv("LDAP_BASE_DN", "DC=aliseo,DC=local")
-    # Apenas o CN do grupo — verificação por substring no memberOf
-    LDAP_GROUP: str = os.getenv("LDAP_GROUP", "GRP_App_Acessar_Bus.io")
+
+    # Grupos de acesso — apenas o CN do grupo (verificação por substring no memberOf)
+    # Nível 1: administrador — acesso total (futuro CRUD)
+    LDAP_GROUP_ADMIN: str = os.getenv("LDAP_GROUP_ADMIN", "GRP_App_Bus.io_Admin")
+    # Nível 2: logística — pode marcar/alterar dados
+    LDAP_GROUP_LOGISTICA: str = os.getenv("LDAP_GROUP_LOGISTICA", "GRP_App_Bus.io_Logistica")
+    # Nível 3: visualização — somente leitura
+    LDAP_GROUP_VIEWER: str = os.getenv("LDAP_GROUP_VIEWER", "GRP_App_Bus.io_Viewer")
 
     # Chave de assinatura da sessão HTTP (cookie seguro)
     SESSION_SECRET: str = os.getenv("SESSION_SECRET", "dev-secret-troque-em-producao")

@@ -33,6 +33,7 @@ def login_post(
         )
     request.session["username"] = usuario.username
     request.session["nome"] = usuario.nome
+    request.session["role"] = usuario.role
     return RedirectResponse("/", status_code=302)
 
 

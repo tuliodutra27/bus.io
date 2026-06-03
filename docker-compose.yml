@@ -28,12 +28,15 @@ services:
     environment:
       DATABASE_URL: mysql+pymysql://${MYSQL_USER:-busio}:${MYSQL_PASSWORD:-busio}@db:3306/${MYSQL_DATABASE:-busio}
       SEED_ON_START: "true"
-      # Active Directory — ajuste conforme seu ambiente
+      # Active Directory — ajuste no .env
       LDAP_SERVER: ${LDAP_SERVER:-ldap://dc.aliseo.local}
       LDAP_DOMAIN: ${LDAP_DOMAIN:-aliseo.local}
       LDAP_BASE_DN: ${LDAP_BASE_DN:-DC=aliseo,DC=local}
-      LDAP_GROUP: ${LDAP_GROUP:-GRP_App_Acessar_Bus.io}
-      # Troque por um valor aleatório longo em produção
+      # Grupos de acesso (CN do grupo no AD)
+      LDAP_GROUP_ADMIN: ${LDAP_GROUP_ADMIN:-GRP_App_Bus.io_Admin}
+      LDAP_GROUP_LOGISTICA: ${LDAP_GROUP_LOGISTICA:-GRP_App_Bus.io_Logistica}
+      LDAP_GROUP_VIEWER: ${LDAP_GROUP_VIEWER:-GRP_App_Bus.io_Viewer}
+      # Sessão
       SESSION_SECRET: ${SESSION_SECRET:-dev-secret-troque-em-producao}
     ports:
       - "8000:8000"
