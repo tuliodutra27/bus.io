@@ -8,21 +8,18 @@ Pré-requisito (instalar uma vez):
 Uso:
     python scripts/importar_planilha.py PLANILHA.xlsx [saida.sql]
 
-    Padrão de saída: dados_reais.sql na pasta corrente.
+    Padrao de saida: dados_reais.sql na pasta corrente.
 
 Para aplicar ao banco (com Docker rodando):
-    docker exec -i busio_db sh -c \\
+    docker exec -i busio_db sh -c \
         'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"' < dados_reais.sql
 
-Observações sobre a planilha:
-  - Abas ADM:    01ADM, 02ADM, 03ADM, 04ADM
-  - Abas Turno:  ROTA 01Turno, ROTA 02Turno, ROTA 03Turno, ROTA 04Turno
-  - 01ADM e ROTA 03Turno/04Turno não têm Nº Assento → só cria Colaborador, sem AlocacaoFixa.
-  - Colaboradores que aparecem em múltiplos ônibus são deduplicados pelo nome.
-  - Linhas de continuação (mesma pessoa, letras A/B/C/D distintas) são agrupadas.
-  - Quant='AFASTADO' → cria Colaborador mas sem AlocacaoFixa.
-  - Campo Horario: 'Aliseo ADM'=ALISEO regime admin, 'Aliseo Turno'=ALISEO regime turno,
-                   'Tercerizadas'=Terceirizada.
+Regras de atribuicao de assentos:
+  - ADM-04 : usa o numero de assento que esta na planilha.
+  - Demais  : assentos atribuidos automaticamente — mulheres primeiro (assentos menores),
+              homens em seguida. Para onibus de turno, a atribuicao e feita por letra
+              (A/B/C/D), entao diferentes pessoas podem ocupar o mesmo numero de assento
+              em letras diferentes.
 """
 
 import sys
@@ -32,24 +29,65 @@ from pathlib import Path
 try:
     import openpyxl
 except ImportError:
-    sys.exit("Erro: instale openpyxl antes de rodar o script:\n  pip install openpyxl")
+    sys.exit("Erro: instale openpyxl antes de rodar:\n  pip install openpyxl")
 
 
 # ---------------------------------------------------------------------------
-# Configuração
+# Configuracao
 # ---------------------------------------------------------------------------
 
+# (num, aba_adm, aba_turno, cidade)
 PARES_ROTA = [
-    # (num, aba_adm,  aba_turno,        cidade_rota)
     (1, "01ADM",  "ROTA 01Turno", "Campos dos Goytacazes"),
     (2, "02ADM",  "ROTA 02Turno", "Campos dos Goytacazes"),
     (3, "03ADM",  "ROTA 03Turno", "Campos dos Goytacazes"),
-    (4, "04ADM",  "ROTA 04Turno", "São João da Barra"),
+    (4, "04ADM",  "ROTA 04Turno", "Sao Joao da Barra"),
 ]
 
-ADM_CAP = 50   # capacidade ônibus administrativo
-TUR_CAP = 32   # capacidade micro de turno (margem para ROTA 01Turno que tem 32 vagas)
+# ADM-04 e o unico onibus que usa os assentos da planilha
+NUM_ROTA_COM_ASSENTO_PLANILHA = {4}   # somente ADM-04
+
+ADM_CAP_PADRAO = 50
+TUR_CAP_PADRAO = 32
+
 LETRAS_VALIDAS = {"A", "B", "C", "D"}
+
+# Primeiros nomes femininos brasileiros (lista abrangente)
+NOMES_FEMININOS = {
+    "ANA", "ALICE", "ALINE", "ALICIA", "ALBA",
+    "AMANDA", "AMELIA", "ADRIANA", "ADRIELE", "ADRIELLA", "ADRIELLY",
+    "ALESSANDRA", "ANGELA", "ANNA", "ARIANA",
+    "BARBARA", "BEATRIZ", "BRUNA",
+    "CAMILA", "CAMILI", "CARLA", "CAROL", "CAROLINA", "CAROLINE",
+    "CASSIA", "CARINA", "CINTIA", "CLARICE", "CRISTIANE", "CRISTINA",
+    "DANIELA", "DANIELE", "DAIANE", "DEBORA", "DEISE", "DENISE",
+    "DIANA", "DIENE",
+    "EDILEIA", "EDINA", "EDNA", "EDUARDA",
+    "ELAINE", "ELIZABETE", "ELIZANGELA", "ELIANE",
+    "ELLEN", "EMILIA", "EMANUELA", "ERICA", "ERIKA", "ERQUILEI",
+    "FABIANA", "FABIA", "FERNANDA", "FERNADA", "FLAVIA", "FRANCISCA",
+    "GABRIELA", "GABRYELA", "GIOVANA", "GRAZIELA",
+    "HERICA", "HERIKA",
+    "INGRID", "ISIS", "ISABELA", "ISABELE", "IZIS",
+    "JAQUELINE", "JESSICA", "JHENIFER", "JOANA", "JOLANE",
+    "JULIANA", "JULIA", "JULLYANA", "JULYA",
+    "KISSILA",
+    "LAILA", "LARA", "LARISSA", "LAURA", "LAIS", "LEIDYMARA",
+    "LIDIA", "LUANA", "LUANE", "LUCIA", "LUCIANA", "LUCIARA",
+    "MARCELA", "MARCIA", "MARIANA", "MARISTELA", "MARLENY", "MEIRY",
+    "MICHELI", "MICHELLY", "MILENA", "MIRIAN",
+    "NADIA", "NATALIA", "NAYARA",
+    "ODALIA", "OLIVIA",
+    "PAULA", "PAOLA", "PRISCILA", "PRISCILLA",
+    "QUESIA",
+    "RAFAELA", "RAQUEL", "REBECA", "RENATA", "ROBERTA",
+    "ROSA", "ROSANA", "ROSANGELA",
+    "SABRINA", "SAMARA", "SANDRA", "SARA", "SARAH", "SIMONE",
+    "SOLANGE", "STEPHANY", "SUELEN", "SUELLEN",
+    "TAINARA", "TAMARA", "TATIANA", "THAMIRES", "THAYANE",
+    "VALDIRENE", "VALERIA", "VANESSA", "VIVIAN", "VIVIANE",
+    "YARA",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -57,10 +95,14 @@ LETRAS_VALIDAS = {"A", "B", "C", "D"}
 # ---------------------------------------------------------------------------
 
 def normalizar_nome(txt: str) -> str:
-    """Remove acentos, padroniza espaços, converte para maiúsculo."""
     nfkd = unicodedata.normalize("NFKD", str(txt))
     sem_acento = "".join(c for c in nfkd if not unicodedata.combining(c))
     return " ".join(sem_acento.upper().split())
+
+
+def detectar_genero(nome: str) -> str:
+    primeiro = normalizar_nome(nome).split()[0] if nome else ""
+    return "F" if primeiro in NOMES_FEMININOS else "M"
 
 
 def sql_str(val) -> str:
@@ -69,20 +111,12 @@ def sql_str(val) -> str:
     return "'" + str(val).replace("\\", "\\\\").replace("'", "\\'") + "'"
 
 
-def sql_int(val) -> str:
-    if val is None:
-        return "NULL"
-    try:
-        return str(int(val))
-    except (ValueError, TypeError):
-        return "NULL"
+def cap_minima(n: int) -> int:
+    """Arredonda para o proximo multiplo de 4 >= n."""
+    return max(((n + 3) // 4) * 4, 4)
 
 
 def detectar_colunas(header: tuple) -> dict:
-    """
-    Mapeia nome → índice de coluna pelo cabeçalho.
-    Aceita layouts diferentes (ROTA 01Turno tem colunas deslocadas).
-    """
     cols = {}
     for i, v in enumerate(header):
         if v is None:
@@ -109,8 +143,7 @@ def detectar_colunas(header: tuple) -> dict:
     return cols
 
 
-def empresa_regime(horario: str) -> tuple[str, str]:
-    """Retorna (empresa, regime) a partir do campo Horario/Turno da planilha."""
+def empresa_regime(horario) -> tuple[str, str]:
     if not horario:
         return ("ALISEO", "turno")
     h = str(horario).strip()
@@ -122,7 +155,6 @@ def empresa_regime(horario: str) -> tuple[str, str]:
 
 
 def extrair_nome_rota(ws) -> str:
-    """Extrai o nome da rota da primeira linha da aba."""
     row1 = next(ws.iter_rows(min_row=1, max_row=1, values_only=True))
     for v in row1:
         if v and str(v).strip():
@@ -135,77 +167,53 @@ def extrair_nome_rota(ws) -> str:
 # ---------------------------------------------------------------------------
 
 def ler_aba_adm(ws) -> list[dict]:
-    """
-    Lê aba ADM. Retorna lista de dicts por colaborador.
-    Header na linha 2, dados a partir da linha 3.
-    """
     rows = list(ws.iter_rows(values_only=True))
     if len(rows) < 2:
         return []
-
     cols = detectar_colunas(rows[1])
     if "nome" not in cols:
-        print(f"  AVISO: coluna 'Nome' não encontrada em {ws.title}")
         return []
 
     resultado = []
     for row in rows[2:]:
         nome_val = row[cols["nome"]] if len(row) > cols["nome"] else None
-        if not nome_val or str(nome_val).strip() == "":
+        if not nome_val or not str(nome_val).strip():
             continue
 
-        nome = str(nome_val).strip()
-        horario_raw = row[cols["horario"]] if "horario" in cols and len(row) > cols["horario"] else None
-        emp, reg = empresa_regime(str(horario_raw or "Aliseo ADM"))
+        def cel(key, default=None):
+            idx = cols.get(key)
+            return row[idx] if idx is not None and idx < len(row) else default
+
+        horario_raw = cel("horario", "Aliseo ADM")
+        emp, reg = empresa_regime(horario_raw)
 
         assento_num = None
-        if "assento" in cols and len(row) > cols["assento"]:
-            av = row[cols["assento"]]
-            if av is not None:
-                try:
-                    assento_num = int(av)
-                except (ValueError, TypeError):
-                    pass
-
-        cargo = None
-        if "cargo" in cols and len(row) > cols["cargo"]:
-            cv = row[cols["cargo"]]
-            cargo = str(cv).strip() if cv else None
-
-        bairro = None
-        if "bairro" in cols and len(row) > cols["bairro"]:
-            bv = row[cols["bairro"]]
-            bairro = str(bv).strip() if bv else None
+        av = cel("assento")
+        if av is not None:
+            try:
+                assento_num = int(av)
+            except (ValueError, TypeError):
+                pass
 
         resultado.append({
-            "nome": nome,
-            "cargo": cargo or None,
-            "bairro": bairro or None,
+            "nome":     str(nome_val).strip(),
+            "cargo":    str(cel("cargo") or "").strip() or None,
+            "bairro":   str(cel("bairro") or "").strip() or None,
             "telefone": None,
-            "empresa": emp,
-            "regime": reg,
-            "assento": assento_num,
-            "letras": ["ADM"],   # ônibus administrativo usa sentinel ADM
+            "empresa":  emp,
+            "regime":   reg,
+            "assento":  assento_num,   # so usado em ADM-04
+            "letras":   ["ADM"],
         })
-
     return resultado
 
 
 def ler_aba_turno(ws) -> list[dict]:
-    """
-    Lê aba Turno. Lida com:
-      - ROTA 01Turno: colunas deslocadas (Matricula em col 3, Nome em col 5)
-      - ROTA 02-04: colunas em posições padrão
-      - Linhas de continuação (mesma pessoa, letras A/B/C/D adicionais)
-      - Quant='AFASTADO' → sem AlocacaoFixa
-    """
     rows = list(ws.iter_rows(values_only=True))
     if len(rows) < 2:
         return []
-
     cols = detectar_colunas(rows[1])
     if "nome" not in cols:
-        print(f"  AVISO: coluna 'Nome' não encontrada em {ws.title}")
         return []
 
     c_nome = cols["nome"]
@@ -218,36 +226,30 @@ def ler_aba_turno(ws) -> list[dict]:
     c_qua  = cols.get("quant")
 
     def cel(row, idx):
-        if idx is None or idx >= len(row):
-            return None
-        return row[idx]
+        return row[idx] if idx is not None and idx < len(row) else None
 
     resultado = []
-    atual = None  # pessoa sendo acumulada
+    atual = None
 
     for row in rows[2:]:
-        nome_val = cel(row, c_nome)
+        nome_val  = cel(row, c_nome)
         letra_val = cel(row, c_let)
         quant_val = cel(row, c_qua)
 
-        # Normaliza letra
         letra = None
         if letra_val:
             ls = str(letra_val).strip().upper()
             if ls in LETRAS_VALIDAS:
                 letra = ls
-            # 'Aliseo ADM' como letra → admin temporário no turno, sem letra
 
         nome = str(nome_val).strip() if nome_val and str(nome_val).strip() else None
 
         if nome:
-            # Nova pessoa: fecha a anterior e começa nova
             if atual:
                 resultado.append(atual)
 
             afastado = str(quant_val or "").upper() == "AFASTADO"
-            horario_raw = cel(row, c_hor)
-            emp, reg = empresa_regime(str(horario_raw or "Aliseo Turno"))
+            emp, reg = empresa_regime(cel(row, c_hor))
 
             assento_num = None
             av = cel(row, c_ass)
@@ -257,30 +259,28 @@ def ler_aba_turno(ws) -> list[dict]:
                 except (ValueError, TypeError):
                     pass
 
-            cargo = str(cel(row, c_car) or "").strip() or None
-            bairro = str(cel(row, c_bai) or "").strip() or None
+            cargo   = str(cel(row, c_car) or "").strip() or None
+            bairro  = str(cel(row, c_bai) or "").strip() or None
             tel_raw = cel(row, c_tel)
             telefone = str(tel_raw).strip() if tel_raw else None
 
             letras = []
             if not afastado and letra:
                 letras = [letra]
-            # Se Horario é ADM, esta pessoa não tem letra de turno fixa
 
             atual = {
-                "nome": nome,
-                "cargo": cargo,
-                "bairro": bairro,
+                "nome":     nome,
+                "cargo":    cargo,
+                "bairro":   bairro,
                 "telefone": telefone,
-                "empresa": emp,
-                "regime": reg,
-                "assento": assento_num,
-                "letras": letras,
+                "empresa":  emp,
+                "regime":   reg,
+                "assento":  assento_num,
+                "letras":   letras,
                 "afastado": afastado,
             }
 
         elif letra and atual and letra not in atual["letras"]:
-            # Linha de continuação: mesma pessoa, nova letra
             atual["letras"].append(letra)
 
     if atual:
@@ -290,22 +290,68 @@ def ler_aba_turno(ws) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Geração de SQL
+# Auto-atribuicao de assentos
 # ---------------------------------------------------------------------------
 
-def gerar_assentos_vals(onibus_id: int, capacidade: int, id_inicial: int) -> tuple[list[str], int]:
+def ordenar_por_genero(dados: list[dict]) -> list[dict]:
+    """Retorna lista com mulheres primeiro, depois homens (ordem de aparicao preservada)."""
+    mulheres = [d for d in dados if detectar_genero(d["nome"]) == "F"]
+    homens   = [d for d in dados if detectar_genero(d["nome"]) == "M"]
+    return mulheres + homens
+
+
+def auto_assentos_adm(dados: list[dict]) -> dict[str, int]:
     """
-    Retorna (lista_de_values_sql, próximo_id_livre).
-    Cada value: (id, onibus_id, numero, fila, coluna, lado)
+    Auto-atribui assentos para onibus ADM.
+    Retorna {nome_norm: num_assento}.
+    Mulheres recebem os menores numeros.
     """
+    vistos: dict[str, dict] = {}
+    for d in dados:
+        key = normalizar_nome(d["nome"])
+        if key not in vistos:
+            vistos[key] = d
+
+    ordenados = ordenar_por_genero(list(vistos.values()))
+    return {normalizar_nome(p["nome"]): i + 1 for i, p in enumerate(ordenados)}
+
+
+def auto_assentos_turno(dados: list[dict]) -> list[tuple[str, int, str]]:
+    """
+    Auto-atribui assentos para onibus de turno, por letra.
+    Mulheres recebem assentos menores dentro de cada letra.
+    Retorna lista de (nome_norm, num_assento, letra).
+    """
+    por_letra: dict[str, list] = {}
+    for d in dados:
+        for letra in d["letras"]:
+            por_letra.setdefault(letra, [])
+            key = normalizar_nome(d["nome"])
+            if not any(x[0] == key for x in por_letra[letra]):
+                por_letra[letra].append((key, d))
+
+    alocacoes = []
+    for letra in sorted(por_letra.keys()):
+        pessoas = [d for _, d in por_letra[letra]]
+        ordenados = ordenar_por_genero(pessoas)
+        for i, p in enumerate(ordenados):
+            alocacoes.append((normalizar_nome(p["nome"]), i + 1, letra))
+    return alocacoes
+
+
+# ---------------------------------------------------------------------------
+# Geracao do SQL
+# ---------------------------------------------------------------------------
+
+def gerar_assentos_vals(onibus_id: int, capacidade: int, id_ini: int):
     vals = []
     for n in range(1, capacidade + 1):
-        aid = id_inicial + n - 1
-        fila = (n - 1) // 4 + 1
-        coluna = (n - 1) % 4 + 1
-        lado = "esq" if coluna <= 2 else "dir"
-        vals.append(f"({aid}, {onibus_id}, {n}, {fila}, {coluna}, '{lado}')")
-    return vals, id_inicial + capacidade
+        aid   = id_ini + n - 1
+        fila  = (n - 1) // 4 + 1
+        col   = (n - 1) % 4 + 1
+        lado  = "esq" if col <= 2 else "dir"
+        vals.append(f"({aid}, {onibus_id}, {n}, {fila}, {col}, '{lado}')")
+    return vals, id_ini + capacidade
 
 
 def gerar_sql(xlsx_path: Path, saida_path: Path):
@@ -313,203 +359,192 @@ def gerar_sql(xlsx_path: Path, saida_path: Path):
     wb = openpyxl.load_workbook(xlsx_path, read_only=True, data_only=True)
 
     # ------------------------------------------------------------------ #
-    # 1. Coleta de dados brutos por rota                                  #
+    # 1. Dados brutos                                                     #
     # ------------------------------------------------------------------ #
     rotas_raw = {}
     for num, aba_adm, aba_turno, cidade in PARES_ROTA:
-        adm_dados  = ler_aba_adm(wb[aba_adm])   if aba_adm   in wb.sheetnames else []
-        tur_dados  = ler_aba_turno(wb[aba_turno]) if aba_turno in wb.sheetnames else []
-        nome_r_adm = extrair_nome_rota(wb[aba_adm])   if aba_adm   in wb.sheetnames else aba_adm
-        nome_r_tur = extrair_nome_rota(wb[aba_turno]) if aba_turno in wb.sheetnames else aba_turno
-        rotas_raw[num] = {
-            "nome_adm":  nome_r_adm,
-            "nome_tur":  nome_r_tur,
-            "cidade":    cidade,
-            "adm":       adm_dados,
-            "turno":     tur_dados,
-        }
-        print(f"  Rota {num}: {len(adm_dados)} ADM, {len(tur_dados)} Turno")
-
+        adm  = ler_aba_adm(wb[aba_adm])    if aba_adm   in wb.sheetnames else []
+        tur  = ler_aba_turno(wb[aba_turno]) if aba_turno in wb.sheetnames else []
+        n_adm = extrair_nome_rota(wb[aba_adm])   if aba_adm   in wb.sheetnames else aba_adm
+        n_tur = extrair_nome_rota(wb[aba_turno]) if aba_turno in wb.sheetnames else aba_turno
+        rotas_raw[num] = {"adm": adm, "turno": tur, "nome_adm": n_adm,
+                          "nome_tur": n_tur, "cidade": cidade}
+        print(f"  Rota {num}: {len(adm)} ADM, {len(tur)} Turno")
     wb.close()
 
     # ------------------------------------------------------------------ #
-    # 2. Deduplicação de colaboradores                                    #
+    # 2. Deduplicacao de colaboradores                                    #
     # ------------------------------------------------------------------ #
-    colaboradores: dict[str, dict] = {}  # nome_norm → {id, nome, ...}
+    colaboradores: dict[str, dict] = {}
     colab_seq = [1]
 
-    def get_colab(dados: dict, rota_id: int) -> dict:
-        key = normalizar_nome(dados["nome"])
+    def get_colab(d: dict, rota_id: int) -> dict:
+        key = normalizar_nome(d["nome"])
         if key not in colaboradores:
-            c = {
-                "id":        colab_seq[0],
-                "nome":      dados["nome"].title(),
+            colaboradores[key] = {
+                "id":       colab_seq[0],
+                "nome":     d["nome"].title(),
                 "matricula": f"IMP{colab_seq[0]:05d}",
-                "cargo":     dados.get("cargo"),
-                "bairro":    dados.get("bairro"),
-                "telefone":  dados.get("telefone"),
-                "empresa":   dados.get("empresa", "ALISEO"),
-                "regime":    dados.get("regime", "turno"),
-                "rota_id":   rota_id,
+                "cargo":    d.get("cargo"),
+                "bairro":   d.get("bairro"),
+                "telefone": d.get("telefone"),
+                "empresa":  d.get("empresa", "ALISEO"),
+                "regime":   d.get("regime", "turno"),
+                "rota_id":  rota_id,
             }
-            colaboradores[key] = c
             colab_seq[0] += 1
         return colaboradores[key]
 
-    # Passa 1: registra todos os colaboradores
     for num, rd in rotas_raw.items():
-        for d in rd["adm"]:
+        for d in rd["adm"] + rd["turno"]:
             get_colab(d, num)
+
+    # ------------------------------------------------------------------ #
+    # 3. Capacidades e mapa de assentos                                   #
+    # ------------------------------------------------------------------ #
+    adm_cap = {}   # num -> capacidade ADM
+    tur_cap = {}   # num -> capacidade Turno
+
+    for num, rd in rotas_raw.items():
+        # ADM: auto-expande se necessario
+        adm_unique = len({normalizar_nome(d["nome"]) for d in rd["adm"]})
+        if num in NUM_ROTA_COM_ASSENTO_PLANILHA:
+            # ADM-04: capacidade fixa; assentos vem da planilha
+            adm_cap[num] = ADM_CAP_PADRAO
+        else:
+            adm_cap[num] = cap_minima(max(adm_unique, ADM_CAP_PADRAO))
+
+        # Turno: max pessoas por letra
+        por_letra = {}
         for d in rd["turno"]:
-            get_colab(d, num)
+            for l in d["letras"]:
+                por_letra.setdefault(l, set()).add(normalizar_nome(d["nome"]))
+        max_pl = max((len(s) for s in por_letra.values()), default=0)
+        tur_cap[num] = cap_minima(max(max_pl, TUR_CAP_PADRAO))
 
-    # ------------------------------------------------------------------ #
-    # 3. Constrói estrutura de IDs (Rota, Onibus, Assento)               #
-    # ------------------------------------------------------------------ #
-    rota_id_map  = {}  # num → rota_id
-    adm_oid_map  = {}  # num → onibus_id
-    tur_oid_map  = {}  # num → onibus_id
-    # assento: (onibus_id, num_assento) → assento_db_id
-    assento_map  = {}
-
-    rota_inserts   = []
-    onibus_inserts = []
-    assento_vals   = []
-
+    # Mapa de IDs: onibus + num_assento -> assento_db_id
+    assento_map: dict[tuple, int] = {}
+    onibus_ids: dict[str, int] = {}  # "adm_N" | "tur_N" -> onibus_id
     oid_seq = [1]
-    ass_id  = [1]
+    ass_ptr = [1]
 
-    for num, rd in sorted(rotas_raw.items()):
-        rid = num  # rota_id = número da rota (1-4)
-        rota_id_map[num] = rid
-        nome_rota = f"{rd['nome_adm']} / {rd['nome_tur']}"
-        rota_inserts.append(
-            f"({rid}, {sql_str(nome_rota)}, {sql_str(rd['cidade'])}, NULL, NULL)"
-        )
-
-        # Ônibus ADM
-        adm_oid = oid_seq[0]; oid_seq[0] += 1
-        adm_oid_map[num] = adm_oid
-        onibus_inserts.append(
-            f"({adm_oid}, {sql_str(f'ADM-0{num}')}, 'admin', {ADM_CAP}, {rid}, 1, 0)"
-        )
-        vals, ass_id[0] = gerar_assentos_vals(adm_oid, ADM_CAP, ass_id[0])
-        assento_vals += vals
-        for n in range(1, ADM_CAP + 1):
-            assento_map[(adm_oid, n)] = ass_id[0] - ADM_CAP + n - 1
-
-        # Ônibus Turno
-        tur_oid = oid_seq[0]; oid_seq[0] += 1
-        tur_oid_map[num] = tur_oid
-        onibus_inserts.append(
-            f"({tur_oid}, {sql_str(f'TUR-0{num}')}, 'micro', {TUR_CAP}, {rid}, 1, 0)"
-        )
-        vals, ass_id[0] = gerar_assentos_vals(tur_oid, TUR_CAP, ass_id[0])
-        assento_vals += vals
-        for n in range(1, TUR_CAP + 1):
-            assento_map[(tur_oid, n)] = ass_id[0] - TUR_CAP + n - 1
-
-    # Corrige mapa de assentos (há um off-by-one nas iterações acima)
-    # Recalcula de forma limpa:
-    assento_map.clear()
-    ass_ptr = 1
     for num in sorted(rotas_raw):
-        adm_oid = adm_oid_map[num]
-        for n in range(1, ADM_CAP + 1):
-            assento_map[(adm_oid, n)] = ass_ptr
-            ass_ptr += 1
-        tur_oid = tur_oid_map[num]
-        for n in range(1, TUR_CAP + 1):
-            assento_map[(tur_oid, n)] = ass_ptr
-            ass_ptr += 1
+        for tipo, cap_val in [("adm", adm_cap[num]), ("tur", tur_cap[num])]:
+            oid = oid_seq[0]; oid_seq[0] += 1
+            onibus_ids[f"{tipo}_{num}"] = oid
+            for n in range(1, cap_val + 1):
+                assento_map[(oid, n)] = ass_ptr[0]
+                ass_ptr[0] += 1
 
     # ------------------------------------------------------------------ #
-    # 4. Monta INSERT de alocações                                        #
+    # 4. Monta INSERTs                                                    #
     # ------------------------------------------------------------------ #
-    aloc_vals = []
-    aloc_seq = [1]
-    ocupados_adm = {}  # (onibus_id, assento_num, letra) → nome
-    ocupados_tur = {}
+    rota_vals   = []
+    onibus_vals = []
+    ass_vals    = []
+    colab_vals  = []
+    aloc_vals   = []
+    avisos      = []
+    aloc_seq    = [1]
 
-    avisos = []
-
+    # Rotas e onibus
     for num, rd in sorted(rotas_raw.items()):
-        adm_oid = adm_oid_map[num]
-        tur_oid = tur_oid_map[num]
+        nome_rota = f"{rd['nome_adm']} / {rd['nome_tur']}"
+        rota_vals.append(
+            f"({num}, {sql_str(nome_rota)}, {sql_str(rd['cidade'])}, NULL, NULL)"
+        )
+        adm_oid = onibus_ids[f"adm_{num}"]
+        tur_oid = onibus_ids[f"tur_{num}"]
+        onibus_vals.append(
+            f"({adm_oid}, {sql_str(f'ADM-0{num}')}, 'admin', {adm_cap[num]}, {num}, 1, 0)"
+        )
+        onibus_vals.append(
+            f"({tur_oid}, {sql_str(f'TUR-0{num}')}, 'micro', {tur_cap[num]}, {num}, 1, 0)"
+        )
+        v_adm, _ = gerar_assentos_vals(adm_oid, adm_cap[num], assento_map[(adm_oid, 1)])
+        ass_vals += v_adm
+        v_tur, _ = gerar_assentos_vals(tur_oid, tur_cap[num], assento_map[(tur_oid, 1)])
+        ass_vals += v_tur
 
-        # ADM
-        for d in rd["adm"]:
-            key = normalizar_nome(d["nome"])
-            c = colaboradores.get(key)
-            if not c:
-                continue
-            if d["assento"] is None:
-                continue
-            nass = d["assento"]
-            if nass < 1 or nass > ADM_CAP:
-                avisos.append(f"ADM-0{num}: assento {nass} fora do range (1-{ADM_CAP}) — {d['nome']}")
-                continue
-            chave = (adm_oid, nass, "ADM")
-            if chave in ocupados_adm:
-                avisos.append(f"ADM-0{num}: assento {nass} duplicado — {d['nome']} (já: {ocupados_adm[chave]})")
-                continue
-            ocupados_adm[chave] = d["nome"]
-            aid = assento_map[(adm_oid, nass)]
-            aloc_vals.append(f"({aloc_seq[0]}, {aid}, {c['id']}, 'ADM')")
-            aloc_seq[0] += 1
-
-        # Turno
-        for d in rd["turno"]:
-            key = normalizar_nome(d["nome"])
-            c = colaboradores.get(key)
-            if not c:
-                continue
-            if d["assento"] is None or not d["letras"]:
-                continue
-            nass = d["assento"]
-            if nass < 1 or nass > TUR_CAP:
-                avisos.append(f"TUR-0{num}: assento {nass} fora do range (1-{TUR_CAP}) — {d['nome']}")
-                continue
-            aid = assento_map[(tur_oid, nass)]
-            for letra in d["letras"]:
-                chave = (tur_oid, nass, letra)
-                if chave in ocupados_tur:
-                    avisos.append(f"TUR-0{num}: assento {nass} letra {letra} duplicado — {d['nome']} (já: {ocupados_tur[chave]})")
-                    continue
-                ocupados_tur[chave] = d["nome"]
-                aloc_vals.append(f"({aloc_seq[0]}, {aid}, {c['id']}, {sql_str(letra)})")
-                aloc_seq[0] += 1
-
-    # ------------------------------------------------------------------ #
-    # 5. Monta INSERT de colaboradores (rota_id = rota onde aparece pela vez)
-    # ------------------------------------------------------------------ #
-    colab_vals = []
+    # Colaboradores
     for c in sorted(colaboradores.values(), key=lambda x: x["id"]):
         colab_vals.append(
             f"({c['id']}, {sql_str(c['nome'])}, {sql_str(c['matricula'])}, "
             f"{sql_str(c.get('cargo'))}, {sql_str(c.get('telefone'))}, "
             f"'{c['regime']}', {sql_str('Campos dos Goytacazes')}, "
-            f"{sql_str(c.get('bairro'))}, {sql_str(c['empresa'])}, "
-            f"{c['rota_id']})"
+            f"{sql_str(c.get('bairro'))}, {sql_str(c['empresa'])}, {c['rota_id']})"
         )
 
+    # Alocacoes
+    ocupados: dict[tuple, str] = {}   # (onibus_id, assento_num, letra) -> nome
+
+    def add_aloc(onibus_id, num_assento, colab_id, letra, nome_debug, bus_label):
+        chave = (onibus_id, num_assento, letra)
+        if chave in ocupados:
+            avisos.append(
+                f"{bus_label}: assento {num_assento} letra {letra} duplicado -- "
+                f"{nome_debug} (ja: {ocupados[chave]})"
+            )
+            return
+        cap = adm_cap if "ADM" in bus_label else tur_cap
+        num_rota = int(bus_label.split("-0")[1])
+        limite = adm_cap[num_rota] if "ADM" in bus_label else tur_cap[num_rota]
+        if num_assento < 1 or num_assento > limite:
+            avisos.append(f"{bus_label}: assento {num_assento} fora do limite (1-{limite}) -- {nome_debug}")
+            return
+        ocupados[chave] = nome_debug
+        aid = assento_map[(onibus_id, num_assento)]
+        aloc_vals.append(f"({aloc_seq[0]}, {aid}, {colab_id}, {sql_str(letra)})")
+        aloc_seq[0] += 1
+
+    for num, rd in sorted(rotas_raw.items()):
+        adm_oid = onibus_ids[f"adm_{num}"]
+        tur_oid = onibus_ids[f"tur_{num}"]
+
+        # ---- ADM ----
+        if num in NUM_ROTA_COM_ASSENTO_PLANILHA:
+            # ADM-04: usa assentos da planilha
+            for d in rd["adm"]:
+                c = colaboradores.get(normalizar_nome(d["nome"]))
+                if not c or d["assento"] is None:
+                    continue
+                add_aloc(adm_oid, d["assento"], c["id"], "ADM", d["nome"], f"ADM-0{num}")
+        else:
+            # Outros ADM: auto-atribui com mulheres primeiro
+            mapa = auto_assentos_adm(rd["adm"])
+            for nome_norm, num_ass in mapa.items():
+                c = colaboradores.get(nome_norm)
+                if not c:
+                    continue
+                add_aloc(adm_oid, num_ass, c["id"], "ADM", c["nome"], f"ADM-0{num}")
+
+        # ---- Turno ----
+        # Todos os onibus de turno: auto-atribui por letra com mulheres primeiro
+        alocacoes_tur = auto_assentos_turno(rd["turno"])
+        for nome_norm, num_ass, letra in alocacoes_tur:
+            c = colaboradores.get(nome_norm)
+            if not c:
+                continue
+            add_aloc(tur_oid, num_ass, c["id"], letra, c["nome"], f"TUR-0{num}")
+
     # ------------------------------------------------------------------ #
-    # 6. Monta arquivo SQL final                                          #
+    # 5. Arquivo SQL                                                      #
     # ------------------------------------------------------------------ #
-    def bloco(header, vals, colunas):
+    def bloco(tabela, colunas, vals):
         if not vals:
             return []
-        linhas = [f"INSERT INTO {header} ({colunas}) VALUES"]
-        linhas.append(",\n".join(f"  {v}" for v in vals) + ";")
-        return linhas
+        return [
+            f"INSERT INTO {tabela} ({colunas}) VALUES",
+            ",\n".join(f"  {v}" for v in vals) + ";",
+            "",
+        ]
 
-    sql_lines = [
-        "-- ===========================================================",
+    linhas = [
         "-- Importacao gerada por scripts/importar_planilha.py",
         "-- Para aplicar:",
-        "--   docker exec -i busio_db sh -c \\",
-        "--     'mysql -u\"$MYSQL_USER\" -p\"$MYSQL_PASSWORD\" \"$MYSQL_DATABASE\"' < dados_reais.sql",
-        "-- ===========================================================",
+        "--   docker exec -i busio_db sh -c",
+        "--     'mysql -u\"$MYSQL_USER\" -p\"$MYSQL_PASSWORD\" \"$MYSQL_DATABASE\"'",
+        "--     < dados_reais.sql",
         "",
         "SET NAMES utf8mb4;",
         "SET FOREIGN_KEY_CHECKS=0;",
@@ -525,71 +560,60 @@ def gerar_sql(xlsx_path: Path, saida_path: Path):
         "SET FOREIGN_KEY_CHECKS=1;",
         "",
     ]
+    linhas += bloco("rotas", "id, nome, cidade, bairros, horarios", rota_vals)
+    linhas += bloco("onibus", "id, identificador, tipo, capacidade, rota_id, ativo, exemplo", onibus_vals)
+    linhas += bloco("assentos", "id, onibus_id, numero, fila, coluna, lado", ass_vals)
+    linhas += bloco("colaboradores",
+                    "id, nome, matricula, setor, telefone, regime, cidade, bairro, empresa, rota_id",
+                    colab_vals)
+    linhas += bloco("alocacoes_fixas", "id, assento_id, colaborador_id, turno_letra", aloc_vals)
 
-    sql_lines += bloco(
-        "rotas", rota_inserts,
-        "id, nome, cidade, bairros, horarios"
-    ) + [""]
+    saida_path.write_text("\n".join(linhas), encoding="utf-8")
 
-    sql_lines += bloco(
-        "onibus", onibus_inserts,
-        "id, identificador, tipo, capacidade, rota_id, ativo, exemplo"
-    ) + [""]
-
-    sql_lines += bloco(
-        "assentos", assento_vals,
-        "id, onibus_id, numero, fila, coluna, lado"
-    ) + [""]
-
-    sql_lines += bloco(
-        "colaboradores", colab_vals,
-        "id, nome, matricula, setor, telefone, regime, cidade, bairro, empresa, rota_id"
-    ) + [""]
-
-    sql_lines += bloco(
-        "alocacoes_fixas", aloc_vals,
-        "id, assento_id, colaborador_id, turno_letra"
-    ) + [""]
-
-    saida_path.write_text("\n".join(sql_lines), encoding="utf-8")
-
-    # ------------------------------------------------------------------ #
-    # 7. Resumo                                                           #
-    # ------------------------------------------------------------------ #
-    print()
-    print("=" * 60)
-    print(f"SQL gerado em: {saida_path}")
-    print(f"  Rotas:        {len(rota_inserts)}")
-    print(f"  Ônibus:       {len(onibus_inserts)}")
-    print(f"  Assentos:     {len(assento_vals)}")
-    print(f"  Colaboradores:{len(colab_vals)}")
-    print(f"  Alocações:    {len(aloc_vals)}")
+    # Arquivo de avisos separado (sem problemas de encoding no console Windows)
     if avisos:
-        print(f"\n  AVISOS ({len(avisos)}):")
-        for a in avisos:
-            print(f"    ! {a}")
+        avisos_path = saida_path.with_suffix(".avisos.txt")
+        avisos_path.write_text("\n".join(avisos), encoding="utf-8")
+        print(f"\n  {len(avisos)} aviso(s) gravados em: {avisos_path}")
+    else:
+        print("\n  Nenhum aviso!")
+
+    # ------------------------------------------------------------------ #
+    # 6. Resumo                                                           #
+    # ------------------------------------------------------------------ #
+    print()
+    print("=" * 60)
+    print(f"SQL gerado: {saida_path}")
+    print(f"  Rotas:         {len(rota_vals)}")
+    print(f"  Onibus:        {len(onibus_vals)}")
+    print(f"  Assentos:      {len(ass_vals)}")
+    print(f"  Colaboradores: {len(colab_vals)}")
+    print(f"  Alocacoes:     {len(aloc_vals)}")
+    print(f"  Avisos:        {len(avisos)}")
     print("=" * 60)
     print()
-    print("Para aplicar ao banco (Docker deve estar rodando):")
-    print('  docker exec -i busio_db sh -c \'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"\' < dados_reais.sql')
+    print("Para aplicar (Docker rodando):")
+    print("  docker exec -i busio_db sh -c \\")
+    print('    \'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"\' \\')
+    print("    < dados_reais.sql")
     print()
-    print("Lembre de desativar o seed para não sobrescrever na próxima subida:")
-    print("  .env -> SEED_ON_START=false")
+    print("Depois, no .env do servidor:")
+    print("  SEED_ON_START=false")
+    print("  docker compose restart app")
 
 
 # ---------------------------------------------------------------------------
 # Ponto de entrada
 # ---------------------------------------------------------------------------
-
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print(__doc__)
         sys.exit(1)
 
-    xlsx_path = Path(sys.argv[1])
+    xlsx = Path(sys.argv[1])
     saida = Path(sys.argv[2]) if len(sys.argv) > 2 else Path("dados_reais.sql")
 
-    if not xlsx_path.exists():
-        sys.exit(f"Arquivo não encontrado: {xlsx_path}")
+    if not xlsx.exists():
+        sys.exit(f"Arquivo nao encontrado: {xlsx}")
 
-    gerar_sql(xlsx_path, saida)
+    gerar_sql(xlsx, saida)
