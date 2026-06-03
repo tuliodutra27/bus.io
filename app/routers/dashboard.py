@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from app.db import get_db
+from app.dependencies import require_login
 from app.models import Onibus
 from app.services import ocupacao
 from app.templating import templates
@@ -12,7 +13,11 @@ router = APIRouter()
 
 
 @router.get("/")
-def index(request: Request, db: Session = Depends(get_db)):
+def index(
+    request: Request,
+    usuario: dict = Depends(require_login),
+    db: Session = Depends(get_db),
+):
     hoje = date.today()
     onibus_list = db.query(Onibus).order_by(Onibus.tipo, Onibus.identificador).all()
 
@@ -30,5 +35,5 @@ def index(request: Request, db: Session = Depends(get_db)):
 
     return templates.TemplateResponse(
         "dashboard.html",
-        {"request": request, "cards": cards, "hoje": hoje.isoformat()},
+        {"request": request, "cards": cards, "hoje": hoje.isoformat(), "usuario": usuario},
     )

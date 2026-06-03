@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from sqlalchemy.orm import Session
 
 from app.db import get_db
+from app.dependencies import require_login
 from app.models import (
     Colaborador,
     ExcecaoData,
@@ -28,8 +29,11 @@ def _parse_data(data: str | None) -> date:
 
 
 @router.get("")
-def form(request: Request, db: Session = Depends(get_db)):
-    # No MVP, hora extra parte de colaboradores administrativos
+def form(
+    request: Request,
+    usuario: dict = Depends(require_login),
+    db: Session = Depends(get_db),
+):
     colaboradores = (
         db.query(Colaborador)
         .filter(Colaborador.regime == Regime.admin)
@@ -38,7 +42,12 @@ def form(request: Request, db: Session = Depends(get_db)):
     )
     return templates.TemplateResponse(
         "hora_extra.html",
-        {"request": request, "colaboradores": colaboradores, "hoje": date.today().isoformat()},
+        {
+            "request": request,
+            "colaboradores": colaboradores,
+            "hoje": date.today().isoformat(),
+            "usuario": usuario,
+        },
     )
 
 
@@ -47,6 +56,7 @@ def sugestao(
     request: Request,
     colaborador_id: int,
     data: str | None = None,
+    usuario: dict = Depends(require_login),
     db: Session = Depends(get_db),
 ):
     """Sugere o ônibus de turno da rota do solicitante e mostra o mapa."""
@@ -77,6 +87,7 @@ def marcar(
     colaborador_id: int = Form(...),
     assento_id: int = Form(...),
     data: str = Form(...),
+    usuario: dict = Depends(require_login),
     db: Session = Depends(get_db),
 ):
     """Marca o assento do solicitante no ônibus de turno para a data."""
@@ -84,7 +95,6 @@ def marcar(
     colaborador = db.get(Colaborador, colaborador_id)
     onibus_turno = ocupacao.onibus_turno_da_rota(db, colaborador.rota_id)
 
-    # Verifica se o assento ainda está livre nessa data
     mapa = ocupacao.montar_mapa(db, onibus_turno, dia)
     alvo = next((a for a in mapa.assentos if a.id == assento_id), None)
 

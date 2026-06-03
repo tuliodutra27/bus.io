@@ -107,12 +107,12 @@ def seed(db: Session) -> None:
     _aloca(COLAB_ADMIN, Regime.admin, adm01)
     _aloca(COLAB_TURNO, Regime.turno, tur01)
 
-    # --- Ônibus de exemplo (apenas exibição no MVP) ---
+    # --- Ônibus de exemplo (apenas exibição) ---
+    # Frota real: 4 admin + 4 turno. ADM-01 e TUR-01 são funcionais; demais são exibição.
     exemplos = [
         ("Campos – Norte", CAMPOS, "ADM-02", TipoOnibus.admin, 50),
         ("Campos – Sul", CAMPOS, "ADM-03", TipoOnibus.admin, 50),
         ("São João – Centro", SJB, "ADM-04", TipoOnibus.admin, 50),
-        ("São João – Atafona", SJB, "ADM-05", TipoOnibus.admin, 50),
         ("Campos – Norte", CAMPOS, "TUR-02", TipoOnibus.micro, 30),
         ("São João – Centro", SJB, "TUR-03", TipoOnibus.micro, 30),
         ("São João – Grussaí", SJB, "TUR-04", TipoOnibus.micro, 30),

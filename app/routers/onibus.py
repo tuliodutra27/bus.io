@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.db import get_db
+from app.dependencies import require_login
 from app.models import Assento, Onibus
 from app.services import ocupacao
 from app.templating import templates
@@ -25,6 +26,7 @@ def ver_mapa(
     onibus_id: int,
     request: Request,
     data: str | None = None,
+    usuario: dict = Depends(require_login),
     db: Session = Depends(get_db),
 ):
     onibus = db.get(Onibus, onibus_id)
@@ -36,7 +38,7 @@ def ver_mapa(
 
     return templates.TemplateResponse(
         "onibus_mapa.html",
-        {"request": request, "mapa": mapa, "data": dia.isoformat()},
+        {"request": request, "mapa": mapa, "data": dia.isoformat(), "usuario": usuario},
     )
 
 
@@ -46,6 +48,7 @@ def detalhe_assento(
     assento_id: int,
     request: Request,
     data: str | None = None,
+    usuario: dict = Depends(require_login),
     db: Session = Depends(get_db),
 ):
     """Partial HTMX: dados do assento/colaborador no modal."""

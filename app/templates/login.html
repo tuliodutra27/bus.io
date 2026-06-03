@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login — bus.io</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
+
+  <header class="bg-slate-900 text-white">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center">
+      <span class="text-xl font-bold tracking-tight">bus<span class="text-sky-400">.io</span></span>
+      <span class="ml-auto text-xs text-slate-400">Porto do Açu • Logística de fretados</span>
+    </div>
+  </header>
+
+  <main class="flex-1 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-lg w-full max-w-sm p-8">
+
+      <h1 class="text-2xl font-bold text-slate-800 mb-1">Entrar</h1>
+      <p class="text-sm text-slate-500 mb-6">Use suas credenciais do Active Directory.</p>
+
+      {% if erro %}
+      <div class="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+        {{ erro }}
+      </div>
+      {% endif %}
+
+      <form method="post" action="/login" class="space-y-4">
+        <div>
+          <label for="username" class="block text-sm font-medium text-slate-700 mb-1">Usuário</label>
+          <input
+            id="username"
+            name="username"
+            type="text"
+            autocomplete="username"
+            value="{{ username or '' }}"
+            required
+            autofocus
+            class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+            placeholder="login do AD"
+          >
+        </div>
+
+        <div>
+          <label for="password" class="block text-sm font-medium text-slate-700 mb-1">Senha</label>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            required
+            class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+            placeholder="••••••••"
+          >
+        </div>
+
+        <button
+          type="submit"
+          class="w-full bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-lg px-4 py-2 text-sm transition-colors"
+        >
+          Entrar
+        </button>
+      </form>
+
+    </div>
+  </main>
+
+</body>
+</html>

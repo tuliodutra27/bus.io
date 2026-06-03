@@ -9,7 +9,7 @@ services:
       MYSQL_USER: ${MYSQL_USER:-busio}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-busio}
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
@@ -28,6 +28,13 @@ services:
     environment:
       DATABASE_URL: mysql+pymysql://${MYSQL_USER:-busio}:${MYSQL_PASSWORD:-busio}@db:3306/${MYSQL_DATABASE:-busio}
       SEED_ON_START: "true"
+      # Active Directory — ajuste conforme seu ambiente
+      LDAP_SERVER: ${LDAP_SERVER:-ldap://dc.aliseo.local}
+      LDAP_DOMAIN: ${LDAP_DOMAIN:-aliseo.local}
+      LDAP_BASE_DN: ${LDAP_BASE_DN:-DC=aliseo,DC=local}
+      LDAP_GROUP: ${LDAP_GROUP:-GRP_App_Acessar_Bus.io}
+      # Troque por um valor aleatório longo em produção
+      SESSION_SECRET: ${SESSION_SECRET:-dev-secret-troque-em-producao}
     ports:
       - "8000:8000"
     volumes:
